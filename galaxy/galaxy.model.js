@@ -1,8 +1,8 @@
-import { SolarSystem } from "./solarSystem.model";
+const SolarSystem = require('../galaxy/solarSystem.model.js');
 
-export class Galaxy {
+class Galaxy {
 
-  systems= [];
+  systems = [];
 
   width;
   height;
@@ -13,14 +13,7 @@ export class Galaxy {
     this.height = height;
     this.depth = depth;
 
-    if(!systems || systems.length === 0) {
-      this.generate(width, height, depth, systemCount);
-    } else {
-      this.systems = systems;
-      this.width = width;
-      this.height = height;
-      this.depth = depth;
-    }
+    this.generate(width, height, depth, systemCount);
   }
 
   /**
@@ -37,6 +30,8 @@ export class Galaxy {
     this.systems = this.generateWarpRoutes(this.systems);
   }
 
+  sectorsMissed = 0;
+
   generateCubeGalaxy(width, height, depth, systemCount) {
     // number of stars per sector
     let starsPerSector = systemCount / (width * height * depth);
@@ -47,7 +42,19 @@ export class Galaxy {
         for(let d = 0 ; d < depth ; d++) {
           // find the number of systems to generate
           let starDrop = Math.random() > 0.5 ? 1 : -1;
-          let systems = Math.floor(starsPerSector - starsPerSector * 0.5 * starDrop * Math.random());
+          let systems = starsPerSector - starsPerSector * 0.5 * starDrop * Math.random();
+          
+          // if there is not one star per system then make sure it will average out...
+          if(systems < 1) {
+            if(this.sectorsMissed >= 1) {
+                systems = 1;
+                this.sectorsMissed -= 1;
+            } else {
+                this.sectorsMissed += systems;
+            }
+          }
+          
+          systems = Math.floor(systems);
 
           // create a number of systems in this sector...
           for(let i = 0 ; i < systems ; i++) {
@@ -100,3 +107,5 @@ export class Galaxy {
   }
 
 }
+
+module.exports = Galaxy;
