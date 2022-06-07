@@ -1,7 +1,7 @@
-import { Planet } from "./planet.model";
-import { Star } from "./star.model";
+const Planet = require('../galaxy/planet.model');
+const Star = require('../galaxy/star.model');
 
-export class SolarSystem {
+class SolarSystem {
 
   star;
   planets = [];
@@ -31,3 +31,5 @@ export class SolarSystem {
   }
 
 }
+
+module.exports = SolarSystem;

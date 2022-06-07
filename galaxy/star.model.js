@@ -1,4 +1,4 @@
-export class Star {
+class Star {
 
   power;
 
@@ -12,3 +12,5 @@ export class Star {
   }
 
 }
+
+module.exports = Star;

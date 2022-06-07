@@ -1,6 +1,4 @@
-import { Star } from "./star.model";
-
-export class Planet {
+class Planet {
 
   distance; // in astronomical units
   solarRadiation; // in solar constants
@@ -11,3 +9,5 @@ export class Planet {
   }
 
 }
+
+module.exports = Planet;
