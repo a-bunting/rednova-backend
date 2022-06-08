@@ -18,8 +18,10 @@ router.post('/generateUniverse', (req, res, next) => {
     const singlePlanetSystems = galaxy.systems.filter(a => a.planets.length === 1);
     const startPosition = singlePlanetSystems.length > 0 ? singlePlanetSystems[Math.floor(singlePlanetSystems.length * Math.random())].id : singlePlanetSystems[0].id;
 
+    console.log(startPosition);
+
     // now upload to the database
-    let galaxySql = `INSERT INTO universe__galaxies (width, height, depth, startPosition) VALUES (${width}, ${height}, ${depth}, ${startPosition})`
+    let galaxySql = `INSERT INTO universe__galaxies (width, height, depth, startPosition) VALUES (${width}, ${height}, ${depth}, "${startPosition}")`
 
     const connection = mysql.createConnection({...db, multipleStatements: true});
 
@@ -39,7 +41,7 @@ router.post('/generateUniverse', (req, res, next) => {
 
                 for(let o = 0 ; o < system.planets.length ; o++) {
                     const planet = system.planets[o];
-                    planetValues.push([system.id, methods.generateRandomId(6), planet.distance, planet.solarRadiation, `{ "shipsOnPlanet": [], "population": 0 }`])
+                    planetValues.push([system.id, planet.name, planet.distance, planet.solarRadiation, `{ "shipsOnPlanet": [], "population": 0 }`])
                 }
             }
 
@@ -48,8 +50,6 @@ router.post('/generateUniverse', (req, res, next) => {
             const planetsSql = `INSERT INTO universe__planets (systemid, name, distance, solarRadiation, onPlanet) VALUES ?`;
 
             connection.query(`${systemSql}; ${starsSql}; ${planetsSql}`, [systemValues, starValues, planetValues], (e, r) => {
-
-                console.log(e);
 
                 connection.destroy();
     

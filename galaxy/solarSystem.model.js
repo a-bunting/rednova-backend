@@ -1,5 +1,6 @@
 const Planet = require('../galaxy/planet.model');
 const Star = require('../galaxy/star.model');
+const methods = require('../methods/methods');
 
 class SolarSystem {
 
@@ -14,7 +15,7 @@ class SolarSystem {
 
   constructor(x, y, z) {
     this.coordinates = { x, y, z };
-    this.id = '' + (Math.random() * 100000); // temp
+    this.id = methods.generateRandomSciFiName(0, [], true, false, 2, 3, false);
     this.size = Math.floor(Math.random() * 2) + 1;
 
     // create a star for the system...
@@ -26,7 +27,7 @@ class SolarSystem {
 
     for(let i = 0 ; i < planetCount ; i++) {
       let lastPlanetDistance = this.planets.length > 0 ? this.planets[this.planets.length - 1].distance : 0;
-      this.planets.push(new Planet(this.star, lastPlanetDistance, i));
+      this.planets.push(new Planet(this.star, lastPlanetDistance, i, this.id, planetCount > 1));
     }
   }
 
