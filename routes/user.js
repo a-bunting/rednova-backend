@@ -42,7 +42,7 @@ router.get('/login', (req, res, next) => {
                         res.status(200).json({
                             error: false,
                             message: '',
-                            user: {
+                            data: {
                                 token: generateToken(userDetails[0].username, userDetails[0].email, remainLoggedIn),
                                 username: userDetails[0].username,
                                 email: userDetails[0].email,
@@ -59,6 +59,30 @@ router.get('/login', (req, res, next) => {
         })
 
     })
+
+})
+
+// basically works...
+router.get('/checkAuth', (req, res, next) => {
+
+    try {
+        const token = req.headers.authorization.split(" ")[1];
+
+        jwt.verify(token, 'rednova-v2-token-this-is-to-ensure-you-are-safe-trade-well-my-friendly-peoples');
+        res.status(200).json({
+            error: false, 
+            message: '', 
+            data: {}
+        })   
+
+    } catch(error) {
+        res.status(401).json({
+            error: true, 
+            message: 'Non authenticated user', 
+            data: {}
+        })
+
+    }
 
 })
 
