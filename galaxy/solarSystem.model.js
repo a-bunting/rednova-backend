@@ -15,15 +15,15 @@ class SolarSystem {
 
   constructor(x, y, z) {
     this.coordinates = { x, y, z };
-    this.id = methods.generateRandomSciFiName(0, [], true, false, 2, 3, false);
+    // sort planets out...
+    let extraPlanets = Math.random() < 0.2 ? 5 : 1;
+    let planetCount = Math.abs(Math.floor(Math.random() * (5 + extraPlanets) - 1));
+    
+    this.id = methods.generateRandomSciFiName(0, [], planetCount > 1, false, 2, 3, false);
     this.size = Math.floor(Math.random() * 2) + 1;
 
     // create a star for the system...
     this.star = new Star()
-
-    // sort planets out...
-    let extraPlanets = Math.random() < 0.2 ? 5 : 1;
-    let planetCount = Math.abs(Math.floor(Math.random() * (5 + extraPlanets) - 1));
 
     for(let i = 0 ; i < planetCount ; i++) {
       let lastPlanetDistance = this.planets.length > 0 ? this.planets[this.planets.length - 1].distance : 0;
