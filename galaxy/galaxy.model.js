@@ -91,7 +91,7 @@ class Galaxy {
                     Math.pow(a.coordinates.y - b.coordinates.y, 2) +
                     Math.pow(a.coordinates.z - b.coordinates.z, 2)
                     )
-        return d < this.warpDistance;
+        return (d < this.warpDistance && d !== 0);
       });
 
       // iterate over all the close systems and, based upon probability, forge a route;
