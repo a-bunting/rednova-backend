@@ -18,6 +18,10 @@ router.post('/generateUniverse', checkAuth, checkAdmin, (req, res, next) => {
 
     const galaxy = new Galaxy(width, height, depth, stars);
 
+    // for(let i = 0 ; i < galaxy.systems.length ; i++) {
+    //     console.log(galaxy.systems[i].warpRoutes);
+    // }
+
     const singlePlanetSystems = galaxy.systems.filter(a => a.planets.length === 1);
     const startPosition = singlePlanetSystems.length > 0 ? singlePlanetSystems[Math.floor(singlePlanetSystems.length * Math.random())].id : singlePlanetSystems[0].id;
 
@@ -66,13 +70,13 @@ router.post('/generateUniverse', checkAuth, checkAdmin, (req, res, next) => {
                         // return all the systems now, this is so the id of the system can be appended to the correct planets
                         const systemQuery = `SELECT id, givenname FROM universe__systems WHERE galaxyid=${galaxyId}`;
                         
-                        connection.query(systemQuery, (e, r) => {
+                        connection.query(systemQuery, (e, systemsResult) => {
                             if(e) errors.returnError(`Database query failure: ${systemQuery}`);
                             // create a big update query to update the planets in one query...
                             let updateQuery = "";
                         
-                            for(let i = 0 ; i < r.length ; i++) {
-                                updateQuery += ` WHEN name LIKE "${r[i].givenname}%" THEN ${r[i].id}`;
+                            for(let i = 0 ; i < systemsResult.length ; i++) {
+                                updateQuery += ` WHEN name LIKE "${systemsResult[i].givenname}%" THEN ${systemsResult[i].id}`;
                             }
 
                             const updatePlanetQuery = `UPDATE universe__planets SET systemid= CASE ${updateQuery} end WHERE galaxyid=${galaxyId}`;
@@ -80,10 +84,32 @@ router.post('/generateUniverse', checkAuth, checkAdmin, (req, res, next) => {
                             // finally append all the system ids into the planets
                             connection.query(updatePlanetQuery, (e, r) => {
                                 if(e) console.log(e);
-                                connection.destroy();
-                                res.status(201).json({ error: false, message: '', data: { galaxy: galaxy, id: galaxyId, name: galaxyName, startTime: result[1][0].startTime } })
+
+                                let warpInsertValues = [];
+
+                                // finally finally add in warp routes...
+                                for(let i = 0 ; i < galaxy.systems.length ; i++) {
+                                    const system = galaxy.systems[i];
+                                    const systemId = systemsResult.filter(a => a.givenname === system.id)[0].id;
+                                
+                                    for(let o = 0 ; o < system.warpRoutes.length ; o++) {
+                                        const toSystemId = systemsResult.filter(a => a.givenname === system.warpRoutes[o].id)[0].id;
+                                        // check if this route exists the other way around...
+                                        const exists = warpInsertValues.findIndex(a => a[1] === toSystemId && a[2] === systemId);
+                                        // if this doesnt exist then fine, add it...
+                                        if(exists === -1) warpInsertValues.push([galaxyId, systemId, toSystemId]);
+                                    }
+                                }
+
+                                const warpRouteInsert = "INSERT INTO universe__warp (galaxyId, sectorA, sectorB) VALUES ?";
+
+                                connection.query(warpRouteInsert, [warpInsertValues], (e, r) => {
+                                    connection.destroy();
+                                    if(e) console.log(e);
+                                    // return the success
+                                    res.status(201).json({ error: false, message: '', data: { id: galaxyId, name: galaxyName, startTime: result[1][0].startTime } })
+                                })
                             })
-                            
                         })
                     })
                 })
@@ -114,7 +140,8 @@ router.post('/deleteGalaxy', checkAuth, checkAdmin, (req, res, next) => {
     const connection = mysql.createConnection({...db, multipleStatements: true});
     const sql = `   DELETE FROM universe__galaxies WHERE id=${galaxyId} ; 
                     DELETE FROM universe__systems WHERE galaxyid=${galaxyId} ;
-                    DELETE FROM universe__planets WHERE galaxyid=${galaxyId}`;
+                    DELETE FROM universe__planets WHERE galaxyid=${galaxyId} ; 
+                    DELETE FROM universe__warp WHERE galaxyid=${galaxyId}`;
 
     connection.query(sql, (e, r) => {
         connection.destroy();
