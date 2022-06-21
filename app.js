@@ -4,6 +4,7 @@ const bodyParser = require('body-parser');
 const adminRoutes = require('./routes/admin');
 const userRoutes = require('./routes/user');
 const moveRoutes = require('./routes/move');
+const galaxyRoutes = require('./routes/galaxy');
 
 const app = express();
 
@@ -21,5 +22,6 @@ app.use((req, res, next) => {
 app.use("/api/administration", adminRoutes);
 app.use("/api/user", userRoutes);
 app.use("/api/move", moveRoutes);
+app.use("/api/galaxy", galaxyRoutes);
 
 module.exports = app;

@@ -8,56 +8,52 @@ class Game {
     ticksElapsed = 0;
     tickInterval = 1000;
 
-    clients = new Map();
     
     constructor() {
         this.ticks();
         this.webSocketServer();
     }
-
+    
     ticks() {
         this.tickCounter = setInterval(() => {
             const time = 5;
-            const message = `Time: ${time} - tick!`;
+            const message = { type: 'tick', message: '', data: { quantity: 1 }};
             this.sendWebsockMessage(message);
-            this.ticksElapsed++;
         }, this.tickInterval);
     }
-
+    
     getTimeAlive() {
         return this.tickCounter * this.tickInterval;
     }
+    
+    clients = [];
+    wss;
 
     webSocketServer() {
-        const wss = new WebSocket.Server({ port: 7072 });
+        this.wss = new WebSocket.Server({ port: 7072 });
 
-        wss.on('connection', (ws) => {
+        this.wss.on('connection', (ws) => {
             const id = methods.generateRandomId(5);
-            this.clients.set(ws, { id });
-            
-            ws.on('open', () => {
-                console.log(`Client ${id} has connected.`)
-                this.sendWebsockMessage(`User ${id} connected...`);
-            });
+            this.clients.push({socket: ws, data: { id }});
+            console.log(`Client ${id} has connected.`)
 
             ws.on('message', (msg) => {
-                const message = JSON.parse(msg);            
+                const message = JSON.parse(msg);         
                 console.log(message);
-                this.sendWebsockMessage(`New user connected, ${id}`);
             });
-            
+
             ws.on('close', () => {
-                console.log(`Client ${id} has disconnected.`)
-                this.clients.delete(ws);
+                console.log(`Client ${id} has disconnected`);
+                this.clients = this.clients.filter(client => client.socket !== ws);
             })
+
         })
-        
-        console.log("websockets functioning");
     }
 
     sendWebsockMessage(msg) {
-        [...this.clients.keys()].forEach(client => {
-            client.send(msg);
+        this.clients.forEach(client => {
+            console.log(JSON.parse(JSON.stringify(msg)));
+            client.socket.send(JSON.stringify(msg));
         });
     }
 }
