@@ -61,6 +61,7 @@ class Galaxy {
             let system = new SolarSystem(-0.5 * width + w + Math.random(), -height * 0.5 + h + Math.random(), -depth * 0.5 + d + Math.random());
             newGalaxy.push(system);
           }
+
         }
       }
     }
