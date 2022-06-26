@@ -59,7 +59,8 @@ class Game {
     }
 
     tick(galaxyId) {
-        const message = { type: 'tick', message: '', data: { quantity: 1 }};
+        const server = this.servers.find(server => server.id === galaxyId);
+        const message = { type: 'tick', message: '', data: { quantity: 1, timeUntilNextTick: server.tickPeriod }};
         this.sendWebsockMessage(message, galaxyId);
     }
     
@@ -81,7 +82,8 @@ class Game {
             console.log(`Client ${id} has connected.`)
 
             ws.on('message', (msg) => {
-                const message = JSON.parse(msg);         
+                const message = JSON.parse(msg);     
+                console.log(`Message from ${message.username}: ${msg}`);    
 
                 if(message.type === `sub`) {
                     // this may be initial user data to add to the client.
@@ -91,15 +93,19 @@ class Game {
                         user.data.subscribed = true;
                         user.data.email = message.email;
                         user.data.username = message.username;
-                        user.data.galaxyId = message.galaxyId;
+                        user.data.galaxyId = +message.galaxyId;
                     }
-                    console.log(user.data);
                 }
             });
 
             ws.on('close', () => {
                 console.log(`Client ${id} has disconnected`);
-                this.clients = this.clients.filter(client => client.socket !== ws);
+                const clientId = this.clients.findIndex(client => client.data.id === id);
+
+                if(clientId !== -1) {
+                    this.clients[clientId].socket.close();
+                    this.clients.splice(clientId, 1);
+                }
             })
 
         })
@@ -109,7 +115,9 @@ class Game {
         this.clients.forEach(client => {
             if(galaxyId) {
                 // send only to this galaxy
-                if(client.galaxyId === galaxyId) client.socket.send(JSON.stringify(msg));
+                if(client.data.galaxyId === galaxyId) {
+                    client.socket.send(JSON.stringify(msg));
+                }
             } else {
                 // send to all galaxies...
                 client.socket.send(JSON.stringify(msg));

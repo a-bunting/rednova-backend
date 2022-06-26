@@ -26,7 +26,7 @@ router.post('/generateUniverse', checkAuth, checkAdmin, (req, res, next) => {
     const startPosition = singlePlanetSystems.length > 0 ? singlePlanetSystems[Math.floor(singlePlanetSystems.length * Math.random())].id : singlePlanetSystems[0].id;
 
     // now upload to the database
-    let galaxySql = `INSERT INTO universe__galaxies (name, width, height, depth) VALUES ("${galaxyName}", ${width}, ${height}, ${depth}) ; SELECT id, name, startTime FROM universe__galaxies WHERE id = LAST_INSERT_ID()`;
+    let galaxySql = `INSERT INTO universe__galaxies (name, width, height, depth, endTime) VALUES ("${galaxyName}", ${width}, ${height}, ${depth}, DATE_ADD(CURRENT_TIMESTAMP(), INTERVAL 1 MONTH)) ; SELECT id, name, startTime FROM universe__galaxies WHERE id = LAST_INSERT_ID()`;
 
     const connection = mysql.createConnection({...db, multipleStatements: true});
 
@@ -43,7 +43,7 @@ router.post('/generateUniverse', checkAuth, checkAdmin, (req, res, next) => {
             // now add systems...
             for(let i = 0 ; i < galaxy.systems.length ; i++) {
                 const system = galaxy.systems[i];
-                systemValues.push([galaxyId, system.coordinates.x, system.coordinates.y, system.coordinates.z, system.size, system.id, system.star.power])
+                systemValues.push([i+1, galaxyId, system.coordinates.x, system.coordinates.y, system.coordinates.z, system.size, system.id, system.star.power])
 
                 for(let o = 0 ; o < system.planets.length ; o++) {
                     const planet = system.planets[o];
@@ -51,7 +51,7 @@ router.post('/generateUniverse', checkAuth, checkAdmin, (req, res, next) => {
                 }
             }
 
-            const systemSql = `INSERT INTO universe__systems (galaxyid, x, y, z, size, givenname, starPower) VALUES ?`;
+            const systemSql = `INSERT INTO universe__systems (sectorid, galaxyid, x, y, z, size, givenname, starPower) VALUES ?`;
             const planetsSql = `INSERT INTO universe__planets (galaxyid, systemid, name, distance, solarRadiation, onPlanet) VALUES ?`;
 
             connection.query(`${systemSql} ; ${planetsSql}`, [systemValues, planetValues], (e, r) => {
