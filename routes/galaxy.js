@@ -105,8 +105,15 @@ router.post('/joinGalaxy', checkAuth, (req, res, next) => {
 router.get('/getUserGalaxyData', checkAuth, (req, res, next) => {
     const galaxyId = req.query.galaxyId;
     const userData = methods.getUserDataFromToken(req);
+
+    if(!req.query.galaxyId) {
+        res.status(400).json({ error: true, message: 'GalaxyId or User Data incorrect', data: {}});
+    }
+
     const connection = mysql.createConnection({...db, multipleStatements: true});    
     const checkUserExistsInGalaxyQuery = `SELECT * FROM ships__users WHERE galaxyid=${galaxyId} AND userid=${userData.id}`;
+
+    console.log(checkUserExistsInGalaxyQuery, galaxyId, userData);
     
     connection.connect(connectionError => {
         connection.query(checkUserExistsInGalaxyQuery, (e, result) => {
@@ -118,10 +125,10 @@ router.get('/getUserGalaxyData', checkAuth, (req, res, next) => {
                 const sector = result[0].sector;
 
                 // now get the galaxy data for the current sector..
-                const sectorQuery = `   SELECT * FROM universe__systems WHERE id=${sector} ; 
-                                        SELECT * FROM universe__planets WHERE systemid=${sector} AND galaxyid=${galaxyId} ; 
+                const sectorQuery = `   SELECT * FROM universe__systems WHERE sectorid=${sector} ; 
+                                        SELECT * FROM universe__planets WHERE sectorid=${sector} AND galaxyid=${galaxyId} ; 
                                         SELECT * FROM universe__warp WHERE sectorA=${sector} OR sectorB=${sector} AND galaxyId=${galaxyId} ; 
-                                        SELECT tickPeriod, UNIX_TIMESTAMP(startTime) as startTime, startTurns, TIMESTAMPDIFF(SECOND, startTime, CURRENT_TIMESTAMP()) AS tDiff FROM universe__galaxies WHERE id=${galaxyId} ;
+                                        SELECT tickPeriod, UNIX_TIMESTAMP(startTime) as startTime, startTurns, TIMESTAMPDIFF(SECOND, startTime, CURRENT_TIMESTAMP()) AS tDiff, sectors, startPosition FROM universe__galaxies WHERE id=${galaxyId} ;
                                         SELECT dateJoined, turnsUsed, TIMESTAMPDIFF(SECOND, dateJoined, CURRENT_TIMESTAMP()) AS tDiff FROM users__galaxies WHERE userid=${userData.id} AND galaxyid=${galaxyId} ;
                                         SELECT ships__users.userid, users.username FROM ships__users LEFT JOIN users ON users.id = ships__users.userid WHERE ships__users.sector=${sector} AND ships__users.galaxyid=${galaxyId}`;
 
@@ -132,12 +139,14 @@ router.get('/getUserGalaxyData', checkAuth, (req, res, next) => {
                     const turnsAvailable = calculateAvailableTurns(galaxyResult[3][0].tickPeriod, galaxyResult[3][0].startTurns, galaxyResult[4][0].tDiff, galaxyResult[4][0].turnsUsed);
 
                     const galaxy = galaxyResult[0].map(({ id, galaxyid, ...data}) => { return { ...data }})[0];
-                    const ship = result.map(({ id, galaxyid, userid, ...data}) => { return { ...data }})[0];
+                    const ship = result.map(({ galaxyid, userid, ...data}) => { return { ...data }})[0];
 
                     const data = {
                         server: { 
                             nextTurn: galaxyResult[3][0].tickPeriod - (galaxyResult[3][0].tDiff % galaxyResult[3][0].tickPeriod),
-                            tickDuration: galaxyResult[3][0].tickPeriod
+                            tickDuration: galaxyResult[3][0].tickPeriod,
+                            startSector: galaxyResult[3][0].startPosition, 
+                            sectors: galaxyResult[3][0].sectors
                         },
                         ship: { ...ship }, 
                         user: {
@@ -145,12 +154,11 @@ router.get('/getUserGalaxyData', checkAuth, (req, res, next) => {
                         },
                         system: {
                             ...galaxy,
-                            sectorId: sector,
                             ships: [
                                 ...galaxyResult[5]
                             ],
                             planets: [
-                                ...galaxyResult[1].map(({ id, systemid, galaxyid, ...data}) => { return { ...data }})
+                                ...galaxyResult[1].map(({ systemid, galaxyid, ...data}) => { return { ...data }})
                             ],
                             warp: [
                                 ...galaxyResult[2].map(({ id, galaxyId, sectorA, sectorB, ...data}) => { return { ...data, destination: sectorA === sector ? sectorB : sectorA  }})
@@ -164,6 +172,7 @@ router.get('/getUserGalaxyData', checkAuth, (req, res, next) => {
         })
     })
 })
+
 
 router.post('/moveTo', checkAuth, (req, res, next) => {
     const userData = methods.getUserDataFromToken(req);
@@ -186,12 +195,12 @@ router.post('/moveTo', checkAuth, (req, res, next) => {
 
             const currentSector = queryResult[0].sector;
             let multiQuery = `SELECT universe__galaxies.tickPeriod, universe__galaxies.startTurns, users__galaxies.turnsUsed, TIMESTAMPDIFF(SECOND, users__galaxies.dateJoined, CURRENT_TIMESTAMP()) AS tDiff FROM universe__galaxies LEFT JOIN users__galaxies ON universe__galaxies.id = users__galaxies.galaxyId AND users__galaxies.galaxyId = ${galaxyId} WHERE universe__galaxies.id = ${galaxyId} AND users__galaxies.userid = ${userData.id} `;
-
+            
             // if its a warp move, check that route exists...
             if(method === `warp`) {
                 multiQuery += ` ; SELECT COUNT(*) AS cnt FROM universe__warp WHERE galaxyId = ${galaxyId} AND ((sectorA = ${currentSector} AND sectorB = ${destination}) OR (sectorA = ${destination} AND sectorB = ${currentSector}))`;
             } else {
-                multiQuery += ` ; SELECT SQRT(POWER(ABS(a.x - b.x), 2) + POWER(ABS(a.y - b.y), 2) + POWER(ABS(a.z - b.z), 2)) as distance FROM universe__systems as a LEFT JOIN universe__systems as b ON b.galaxyid = a.galaxyid AND b.id=${destination} WHERE a.id=${currentSector} AND a.galaxyid=${galaxyId}`;
+                multiQuery += ` ; SELECT SQRT(POWER(ABS(a.x - b.x), 2) + POWER(ABS(a.y - b.y), 2) + POWER(ABS(a.z - b.z), 2)) as distance FROM universe__systems as a LEFT JOIN universe__systems as b ON b.galaxyid = a.galaxyid AND b.sectorid=${destination} WHERE a.sectorid=${currentSector} AND a.galaxyid=${galaxyId}`;
             }
 
             connection.query(multiQuery, (e, data) => {
@@ -215,7 +224,7 @@ router.post('/moveTo', checkAuth, (req, res, next) => {
                         })
                     } else {
                         connection.destroy();
-                        res.status(400).json({ error: true, message: 'You cannot afford that route...', data: {} })
+                        res.status(400).json({ error: true, message: 'You cannot afford that route...', data: { required: travelCost, current: turns} })
                     }
                 } else {
                     connection.destroy();
@@ -237,8 +246,8 @@ router.get('/distanceToSector', checkAuth, (req, res, next) => {
     const connection = mysql.createConnection(db);
     const sql = `SELECT SQRT(POWER(ABS(a.x - b.x), 2) + POWER(ABS(a.y - b.y), 2) + POWER(ABS(a.z - b.z), 2)) as distance
                 FROM universe__systems as a 
-                LEFT JOIN universe__systems as b ON b.galaxyid = a.galaxyid AND b.id=${to}
-                WHERE a.id=${from} AND a.galaxyid=${galaxyId}`;
+                LEFT JOIN universe__systems as b ON b.galaxyid = a.galaxyid AND b.sectorid=${to}
+                WHERE a.sectorid=${from} AND a.galaxyid=${galaxyId}`;
 
     connection.connect(connectionError => {
         connection.query(sql, (e, distance) => {

@@ -5,6 +5,7 @@ const adminRoutes = require('./routes/admin');
 const userRoutes = require('./routes/user');
 const moveRoutes = require('./routes/move');
 const galaxyRoutes = require('./routes/galaxy');
+const planetRoutes = require('./routes/planet');
 
 const app = express();
 
@@ -23,5 +24,6 @@ app.use("/api/administration", adminRoutes);
 app.use("/api/user", userRoutes);
 app.use("/api/move", moveRoutes);
 app.use("/api/galaxy", galaxyRoutes);
+app.use("/api/planet", planetRoutes);
 
 module.exports = app;

@@ -79,23 +79,22 @@ class Game {
         this.wss.on('connection', (ws) => {
             const id = methods.generateRandomId(5);
             this.clients.push({socket: ws, data: { id: id, subscribed: false, email: '', username: '', galaxyId: -1 }});
-            console.log(`Client ${id} has connected.`)
-
+            
             ws.on('message', (msg) => {
                 const message = JSON.parse(msg);     
-                console.log(`Message from ${message.username}: ${msg}`);    
-
+                
                 if(message.type === `sub`) {
                     // this may be initial user data to add to the client.
                     let user = this.clients.find(client => client.data.id === id);
                     // chekc if user is found and not already subscribed.
                     if(user && user.data.subscribed === false) {
+                        console.log(`${message.username} has connected.`)
                         user.data.subscribed = true;
                         user.data.email = message.email;
                         user.data.username = message.username;
                         user.data.galaxyId = +message.galaxyId;
                     }
-                }
+                } else console.log(`Message from ${message.username}: ${msg}`);
             });
 
             ws.on('close', () => {
@@ -113,6 +112,7 @@ class Game {
 
     sendWebsockMessage(msg, galaxyId) {
         this.clients.forEach(client => {
+            if(!client.data.subscribed) return;
             if(galaxyId) {
                 // send only to this galaxy
                 if(client.data.galaxyId === galaxyId) {
