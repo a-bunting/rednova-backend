@@ -69,7 +69,7 @@ router.post('/joinGalaxy', checkAuth, (req, res, next) => {
 
                 const userid = userData.id;
                 const sectorId = result[0][0].startPosition;
-                const insertQuery = `INSERT INTO ships__users (userid, galaxyid, sector) VALUES (${userid}, ${galaxyId}, ${sectorId})`;
+                const insertQuery = `INSERT INTO ships__users (userid, galaxyid, sector, money) VALUES (${userid}, ${galaxyId}, ${sectorId}, 9999999999)`;
 
                 connection.query(insertQuery, (e, insertResult) => {
                     if(!e) {
@@ -112,8 +112,6 @@ router.get('/getUserGalaxyData', checkAuth, (req, res, next) => {
 
     const connection = mysql.createConnection({...db, multipleStatements: true});    
     const checkUserExistsInGalaxyQuery = `SELECT * FROM ships__users WHERE galaxyid=${galaxyId} AND userid=${userData.id}`;
-
-    console.log(checkUserExistsInGalaxyQuery, galaxyId, userData);
     
     connection.connect(connectionError => {
         connection.query(checkUserExistsInGalaxyQuery, (e, result) => {
