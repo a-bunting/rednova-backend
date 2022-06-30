@@ -1,0 +1,5 @@
+function getHullCapacity(hullSize) {
+    return 100000000;
+}
+
+module.exports.getHullCapacity = getHullCapacity;
