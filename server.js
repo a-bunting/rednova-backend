@@ -1,6 +1,5 @@
 const app = require("./app");
 const http = require("http");
-const Game = require("./game/game");
 
 const normalizePort = val => {
   var port = parseInt(val, 10);
@@ -46,7 +45,6 @@ const onListening = () => {
 const port = normalizePort(process.env.PORT || "3002");
 app.set("port", port);
 
-const game = new Game();
 const server = http.createServer(app);
 server.on("error", onError);
 server.on("listening", onListening);
