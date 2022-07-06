@@ -1,4 +1,5 @@
 const methods = require('../methods/methods');
+const pricing = require('../methods/pricing');
 
 class Planet {
 
@@ -9,6 +10,7 @@ class Planet {
     population;
 
     products;  
+    buildings;
 
     constructor(star, lastPlanet, index, systemName, planetNumberInName) {
         this.distance = Math.random() * (index + 1) + lastPlanet;
@@ -30,15 +32,18 @@ class Planet {
         const farms         = Math.floor(Math.random() * 0.83  * maxFieldUsage);
         const solarFarms    = Math.floor(Math.random() * 0.05  * maxFieldUsage);
 
+        this.buildings = [
+            { id: 8, name: pricing.getNameFromId(8), quantity: farms },
+            { id: 6, name: pricing.getNameFromId(6), quantity: factories },
+            { id: 7, name: pricing.getNameFromId(7), quantity: refineries },
+            { id: 5, name: pricing.getNameFromId(5), quantity: solarFarms },
+        ];
+          
         this.products = [
-            { id: 'farms', name: 'Farms', current: farms, type: 'building' },
-            { id: 'factoriesGoods', name: 'Goods Factories', current: factories, type: 'building' },
-            { id: 'factoriesConstruction', name: 'Refinerys', current: refineries, type: 'building' },
-            { id: 'solarFarms', name: 'Solar Farms', current: solarFarms, type: 'building' },
-            { id: 'energy', name: 'Energy', current: Math.floor(Math.random() * this.solarRadiation * 20000000), type: 'good' },
-            { id: 'organics', name: 'Organics', current: Math.floor(Math.random() * 20000000), type: 'good' },
-            { id: 'goods', name: 'Goods', current: Math.floor(Math.random() * 10000000), type: 'good' }, 
-            { id: 'constructionMats', name: 'Construction Materials', current: 0, type: 'good' }
+            { id: 2, name: pricing.getNameFromId(2), quantity: Math.floor(Math.random() * this.solarRadiation * 20000000) },
+            { id: 1, name: pricing.getNameFromId(1), quantity: Math.floor(Math.random() * 20000000) },
+            { id: 3, name: pricing.getNameFromId(3), quantity: Math.floor(Math.random() * 10000000) }, 
+            { id: 4, name: pricing.getNameFromId(4), quantity: 0 }
         ]
         
     }
