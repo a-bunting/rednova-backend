@@ -164,6 +164,13 @@ router.get('/getUserGalaxyData', checkAuth, (req, res, next) => {
                         }
                     }
 
+                    // set the users sector...
+                    req.game.setUsersSector(userData.email, galaxyId, data.ship.sector);
+                    // alert other uer sin the same sector to their arrival...
+                    req.game.sendWebsockMessage({
+                        type: 'moveToSector', message: '', data: { userid: userData.id, username: userData.username }
+                    }, galaxyId, data.ship.sector);
+                    // return
                     res.status(200).json({ error: false, message: '', data: data });
                 })
             }
@@ -217,6 +224,13 @@ router.post('/moveTo', checkAuth, (req, res, next) => {
                         connection.query(updateQuery, (e, upd) => {
                             connection.destroy();
                             if(!e) {
+                                 // set the users sector...
+                                req.game.setUsersSector(userData.email, galaxyId, destination);
+                                // and alerts other sin the sector...
+                                req.game.sendWebsockMessage({
+                                    type: 'moveToSector', message: '', data: { userid: userData.id, username: userData.username }
+                                }, galaxyId, destination);
+                                // send response
                                 res.status(200).json({ error: false, message: '', data: {} })
                             }
                         })

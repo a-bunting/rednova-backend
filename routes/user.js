@@ -7,9 +7,9 @@ const mysql = require('mysql');
 const db = require('../environment');
 const checkAdmin = require('../middleware/check-admin');
 
-const generateToken = (email, id, remainLoggedIn) => {
+const generateToken = (email, id, username, remainLoggedIn) => {
     return jwt.sign({
-        email: email, id: id, 
+        email: email, id: id, username: username
     }, 'rednova-v2-token-this-is-to-ensure-you-are-safe-trade-well-my-friendly-peoples', { expiresIn: remainLoggedIn ? '7d' : '1h' });
 }
 
@@ -39,7 +39,7 @@ router.get('/login', (req, res, next) => {
                 bcrypt.compare(password, userDetails[0][0].password).then(correctPassword => {
                     if(correctPassword) {
                         const userData = {
-                            token: generateToken(userDetails[0][0].email, userDetails[0][0].id, remainLoggedIn),
+                            token: generateToken(userDetails[0][0].email, userDetails[0][0].id, userDetails[0][0].username, remainLoggedIn),
                             username: userDetails[0][0].username,
                             email: userDetails[0][0].email,
                             joined: userDetails[0][0].joined, 

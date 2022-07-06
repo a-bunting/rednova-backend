@@ -24,13 +24,13 @@ app.use((req, res, next) => {
 
 
 // all the various api calls...
-// admin
-app.use("/api/administration", adminRoutes);
 
-// add to the game to any api call so websockets may be used in the routes except for admin
 // to shield admin changes from websockets.
+// add to the game to any api call so websockets may be used in the routes except for admin
 app.use((req, res, next) => { req['game'] = game; next(); })
 
+// admin
+app.use("/api/administration", adminRoutes);
 // general game api calls
 app.use("/api/user", userRoutes);
 app.use("/api/move", moveRoutes);
