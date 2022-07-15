@@ -26,10 +26,12 @@ router.get('/getPlanetData', checkAuth, (req, res, next) => {
                 // need to implement sensors et al
                 const planetQuery = `
                     SELECT 
-                        universe__planets.name, universe__planets.planetindex, universe__planets.distance, universe__planets.solarRadiation, universe__planets.fields, universe__planets.population, universe__planets.onPlanet,
-                        universe__planetsgoods.goodid, universe__planetsgoods.quantity
+                        universe__planets.name, universe__planets.owner, universe__planets.owner, universe__planets.trading, universe__planets.planetindex, universe__planets.distance, universe__planets.solarRadiation, universe__planets.fields, universe__planets.population, universe__planets.onPlanet,
+                        universe__planetsgoods.goodid, universe__planetsgoods.quantity, 
+                        users.username
                     FROM universe__planets 
                     LEFT JOIN universe__planetsgoods ON universe__planets.sectorid = universe__planetsgoods.sectorid AND universe__planetsgoods.galaxyid=${galaxyId} AND universe__planets.planetindex = universe__planetsgoods.planetid
+                    LEFT JOIN users ON users.id = universe__planets.owner
                     WHERE universe__planets.galaxyid=${galaxyId} 
                     AND universe__planets.sectorid=${result[0].sector} 
                     AND universe__planets.id=${planetId}
@@ -40,18 +42,20 @@ router.get('/getPlanetData', checkAuth, (req, res, next) => {
 
                     if(planet.length !== 0) {
 
-                        let buildingsData = [...JSON.parse(planet[0].onPlanet)].map(({ id, quantity, ...data }) => { return { id, quantity, ...data, price: 100 }});
-                        let goodsData = planet.map(({ goodid, quantity, ...data }) => { return { id: goodid, name: pricing.getNameFromId(+goodid), quantity: quantity, price: pricing.getPrice(goodid, quantity, planet[0].population) } });
+                        let buildingsData = planet[0].owner === userData.id ? [...JSON.parse(planet[0].onPlanet)].map(({ id, quantity, ...data }) => { return { id, quantity, ...data, price: pricing.getBuildingPrice(id) }}) : [];
+                        let goodsData = planet[0].owner === userData.id || planet[0].trading === 1 ? planet.map(({ goodid, quantity, ...data }) => { return { id: goodid, name: pricing.getNameFromId(+goodid), quantity: quantity, price: pricing.getPrice(goodid, quantity, planet[0].population) } }) : [];
 
                         const planetaryData = {
                             name: planet[0].name, 
-                            index: planet[0].planetindex,
+                            planetindex: planet[0].planetindex,
                             distance: planet[0].distance, 
                             solarRadiation: planet[0].solarRadiation,
                             fields: planet[0].fields,
                             population: planet[0].population,
                             goods: [ ...goodsData ],
-                            buildings: [ ...buildingsData ]
+                            buildings: [ ...buildingsData ],
+                            owner: { currentUser: planet[0].owner === userData.id ? true : false, username: planet[0].username ? planet[0].username : 'Unclaimed Planet' },
+                            trading: planet[0].trading
                         }
 
                         res.status(200).json({ error: false, message: '', data: { ...planetaryData }});
@@ -90,8 +94,6 @@ router.post('/buyResources', checkAuth, (req, res, next) => {
                  AND universe__planets.sectorid=${sectorId} 
                  AND universe__planets.id=${planetId}`;
 
-    console.log(sql);
-
     connection.connect(connectionError => {
         connection.query(sql, (e, result) => {
             if(e) console.log(`Error: ${e}`);
@@ -109,7 +111,7 @@ router.post('/buyResources', checkAuth, (req, res, next) => {
             
             // check if this can be done, and if not, quit with response.!
             if(result[0][0].sector !== sectorId)  { 
-                res.status(200).json({ error: true, message: 'You are not in the same sector as that planet.', data: {}}); 
+                res.status(200).json({ error: true, message: 'you are not in the same sector as that planet.', data: {}}); 
             } else {
                
                 // if we dont have the storage capacity, buy the maximum amount...
@@ -125,7 +127,7 @@ router.post('/buyResources', checkAuth, (req, res, next) => {
                 }
 
                 if(quantityToBuy === 0) {
-                    res.status(200).json({ error: true, message: `You have no more space on your ship!`, data: {}});
+                    res.status(200).json({ error: true, message: `you have no more space on your ship!`, data: {}});
                 } else {
                     // if the good doesnt exist on the ship it needsto be created, otherwise it needs to be updated.
                     let indexInShipJson = shipContents.findIndex(a => a.id === goodsToBuy.id);
@@ -175,8 +177,6 @@ router.post('/sellResources', checkAuth, (req, res, next) => {
                 AND universe__planets.sectorid=${sectorId} 
                 AND universe__planets.id=${planetId}`;
 
-                console.log(sql);
-
     connection.connect(connectionError => {
         connection.query(sql, (e, result) => {
             if(e) console.log(`Error: ${e}`);
@@ -184,7 +184,7 @@ router.post('/sellResources', checkAuth, (req, res, next) => {
             // check if this can be done, and if not, quit with response.
             if(result[0][0].sector !== sectorId)  { 
                 connection.destroy();
-                res.status(200).json({ error: true, message: 'You are not in the same sector as that planet.', data: {}}); 
+                res.status(200).json({ error: true, message: 'you are not in the same sector as that planet.', data: {}}); 
             } else {
                 const shipContents = JSON.parse(result[0][0].storage);
                     
@@ -223,11 +223,190 @@ router.post('/sellResources', checkAuth, (req, res, next) => {
                     })
                 } else {
                     connection.destroy();
-                    res.status(200).json({ error: true, message: `You have no goods of that type to sell`, data: {}});
+                    res.status(200).json({ error: true, message: `you have no goods of that type to sell`, data: {}});
                 }
             }
         })
     })
 })
+
+router.post('/buildBuilding', checkAuth, (req, res, next) => {
+    const userData = methods.getUserDataFromToken(req);
+    const galaxyId = req.body.galaxyId;
+    const sectorId = req.body.sectorId;
+    const planetIndex = req.body.planetIndex;
+    const building = req.body.building;
+
+    const connection = mysql.createConnection({...db, multipleStatements: true});
+    const sql = `
+                    SELECT sector, money FROM ships__users WHERE userid=${userData.id} AND galaxyid=${galaxyId};
+                    SELECT onPlanet, fields FROM universe__planets 
+                    WHERE galaxyid=${galaxyId} AND sectorid=${sectorId} AND planetindex=${planetIndex} AND owner=${userData.id}  
+                `;
+
+    connection.connect(connErr => {
+        connection.query(sql, (e, result) => {
+
+            // check the user is in the right sector
+            if(result[0][0].sector === sectorId) {
+                // we are in the right sector so lets get the amount of cash from the planet
+                const buildingObj = pricing.getGoodsObject().find(a => a.id === building.id);
+
+                // ideally buy as many as requested...
+                let cost = buildingObj.cost * building.quantity;
+                let quantityToBuy = building.quantity;
+
+                // if they dont have enough money, just buy as many as they can...
+                if(cost > result[0][0].money) { quantityToBuy = Math.floor(result[0][0].money / buildingObj.cost); }
+
+                const buildings = JSON.parse(result[1][0].onPlanet);
+                const indexOnPlanetJson = buildings.findIndex(a => a.id === building.id);
+                let freeSpaceOnPlanet = result[1][0].fields;
+
+                // get the number of buildings.
+                buildings.map(a => freeSpaceOnPlanet -= a.quantity);
+
+                // if there is not enough space then build the max.
+                if(freeSpaceOnPlanet < quantityToBuy) { quantityToBuy = freeSpaceOnPlanet; }
+
+                // calculate final copst
+                cost = quantityToBuy * buildingObj.cost;
+
+
+                if(quantityToBuy > 0) {
+                    // buy them
+                    // JSON UPDATE QUERY UGGGGGHHHHHHH!
+                    const totalBuildings = +buildings.find(a => a.id === buildingObj.id).quantity + +quantityToBuy;
+                    const multiQuery = `
+                        UPDATE universe__planets SET onPlanet = JSON_SET(onPlanet, '$[${indexOnPlanetJson}].quantity', '${totalBuildings}') WHERE galaxyid=${galaxyId} AND sectorid=${sectorId} AND planetindex=${planetIndex};
+                        UPDATE ships__users SET money = money - ${cost} WHERE galaxyid=${galaxyId} AND userid=${userData.id}
+                    `;
+
+                    connection.query(multiQuery, (e, r) => {
+                        connection.destroy();
+                        if(!e) res.status(200).json({ error: false, message: '', data: { quantity: quantityToBuy, total: cost }});
+                        else res.status(400).json({ error: true, message: 'A problem with your final query!', data: { }});
+                    })
+                } else {
+                    connection.destroy();
+                    res.status(200).json({ error: true, message: 'you have either filled that planet up, or you dont have enough money on your ship to buy any of those!', data: {}});
+                }
+            } else {
+                connection.destroy();
+                res.status(200).json({ error: true, message: 'you are not in the correct sector to build on that planet', data: {}});
+            }
+        })
+    })
+});
+
+router.post('/destroyBuilding', checkAuth, (req, res, next) => {
+    const userData = methods.getUserDataFromToken(req);
+    const galaxyId = req.body.galaxyId;
+    const sectorId = req.body.sectorId;
+    const planetIndex = req.body.planetIndex;
+    const building = req.body.building;
+
+    const connection = mysql.createConnection({...db, multipleStatements: true});
+    const sql = `
+                    SELECT sector FROM ships__users WHERE userid=${userData.id} AND galaxyid=${galaxyId};
+                    SELECT onPlanet, owner FROM universe__planets 
+                    WHERE galaxyid=${galaxyId} AND sectorid=${sectorId} AND planetindex=${planetIndex} AND owner=${userData.id}  
+                `;
+
+    connection.connect(connErr => {
+        connection.query(sql, (e, result) => {
+            // check the user is in the sector...
+            if(result[0][0].sector === sectorId) {
+                if(result[1][0].owner === userData.id) {
+                    // whats on the planet
+                    const planetaryBuildings = JSON.parse(result[1][0].onPlanet);
+                    const indexOnPlanetJson = planetaryBuildings.findIndex(a => a.id === building.id);
+                    // get an idividual building cost and * by .8 as thats what the user gets back from selling
+                    const buildingPrice = pricing.getGoodsObject().find(a => a.id === building.id).cost * .8;
+                    // if the user is trying to destroy more than they have, max out at how many there are on the planet
+                    const numberToDestroy = +building.quantity <= +planetaryBuildings[indexOnPlanetJson].quantity ? +building.quantity : +planetaryBuildings[indexOnPlanetJson].quantity;
+                    const compensation = numberToDestroy * buildingPrice;
+
+                    if(numberToDestroy === 0 || indexOnPlanetJson === -1) {
+                        connection.destroy();
+                        res.status(200).json({ error: true, message: 'there are none of that building to destroy.', data: {}});
+                    } else {
+
+                        const updates = `
+                            UPDATE ships__users SET money = money + ${compensation} WHERE userid=${userData.id} AND galaxyid=${galaxyId};
+                            UPDATE universe__planets SET onPlanet = JSON_SET(onPlanet, '$[${indexOnPlanetJson}].quantity', '${planetaryBuildings[indexOnPlanetJson].quantity - numberToDestroy}') WHERE galaxyid=${galaxyId} AND sectorid=${sectorId} AND planetindex=${planetIndex};
+                        `;
+    
+                        connection.query(updates, (e, updated) => {
+                            connection.destroy();
+                            console.log(updates, updated);
+                            res.status(200).json({ error: false, message: '', data: { quantity: numberToDestroy, total: compensation }});
+    
+                        })
+                    }
+
+                } else {
+                    connection.destroy();
+                    res.status(200).json({ error: true, message: 'you need to be the owner to build or destroy buildings', data: {}});
+                }
+            } else {
+                connection.destroy();
+                res.status(200).json({ error: true, message: 'you are not in the correct sector to build on that planet', data: {}});
+            }
+        });
+    });
+});
+
+router.post('/updateTrading', checkAuth, (req, res, next) => {
+    const userData = methods.getUserDataFromToken(req);
+    const galaxyId = req.body.galaxyId;
+    const sectorId = req.body.sectorId;
+    const planetIndex = req.body.planetIndex;
+    const tradingStatus = req.body.tradingStatus;
+
+    const connection = mysql.createConnection(db);
+    
+    // first check the user is eligable to change the trade status ad is in the same sector as hte planet
+    const sql = `
+        SELECT  ships__users.sector,
+                universe__planets.trading, universe__planets.owner
+        FROM ships__users 
+        LEFT JOIN universe__planets ON universe__planets.owner = ships__users.userid AND universe__planets.galaxyid = ships__users.galaxyid AND ships__users.sector = universe__planets.sectorid     
+        WHERE ships__users.userid=${userData.id} 
+        AND ships__users.galaxyid=${galaxyId}
+        AND ships__users.sector=${sectorId}
+        AND universe__planets.planetindex=${planetIndex}
+     `;
+
+    connection.connect(connError => {
+        connection.query(sql, (e, r) => {
+            if(e) console.log(`Error: ${e}`);
+            
+            if(r.length === 1) {
+                // the record has been found and this user is able to make changes to this planet
+                const updateSql= `UPDATE universe__planets SET trading=${tradingStatus ? 1 : 0} WHERE galaxyid=${galaxyId} AND sectorid=${sectorId} AND planetindex=${planetIndex}`;
+
+                connection.query(updateSql, (e, result) => {
+                    connection.destroy();
+
+                    if(result) {
+                        if(result['affectedRows'] === 1) {
+                            res.status(200).json({ error: false, message: '', data: {} });
+                        } else {
+                            res.status(200).json({ error: true, message: `trading was already turned ${tradingStatus ? 'on' : 'off'}`, data: { planetAdminAccess: true } });
+                        }
+                    } else {
+                        res.status(200).json({ error: true, message: `you are not eligable to edit that planets trading settings.`, data: { planetAdminAccess: false } });
+                    }
+                })
+            } else {
+                // user not eligable or some data is wrong
+                connection.destroy();
+                res.status(200).json({ error: true, message: 'you are not eligable to change the trading status of this planet.', data: { planetAdminAccess: false } });
+            }
+        });
+    });
+});
+
 
 module.exports = router;

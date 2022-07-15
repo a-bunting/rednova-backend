@@ -124,7 +124,7 @@ router.get('/getUserGalaxyData', checkAuth, (req, res, next) => {
 
                 // now get the galaxy data for the current sector..
                 const sectorQuery = `   SELECT * FROM universe__systems WHERE sectorid=${sector} ; 
-                                        SELECT * FROM universe__planets WHERE sectorid=${sector} AND galaxyid=${galaxyId} ; 
+                                        SELECT universe__planets.*, users.username AS ownerName FROM universe__planets LEFT JOIN users ON universe__planets.owner = users.id WHERE sectorid=${sector} AND galaxyid=${galaxyId} ; 
                                         SELECT * FROM universe__warp WHERE sectorA=${sector} OR sectorB=${sector} AND galaxyId=${galaxyId} ; 
                                         SELECT tickPeriod, UNIX_TIMESTAMP(startTime) as startTime, startTurns, TIMESTAMPDIFF(SECOND, startTime, CURRENT_TIMESTAMP()) AS tDiff, sectors, startPosition FROM universe__galaxies WHERE id=${galaxyId} ;
                                         SELECT dateJoined, turnsUsed, TIMESTAMPDIFF(SECOND, dateJoined, CURRENT_TIMESTAMP()) AS tDiff FROM users__galaxies WHERE userid=${userData.id} AND galaxyid=${galaxyId} ;
@@ -156,7 +156,7 @@ router.get('/getUserGalaxyData', checkAuth, (req, res, next) => {
                                 ...galaxyResult[5]
                             ],
                             planets: [
-                                ...galaxyResult[1].map(({ systemid, galaxyid, ...data}) => { return { ...data }})
+                                ...galaxyResult[1].map(({ systemid, sectorid, galaxyid, owner, population, solarRadiation, onPlanet, currency, fields, ...data}) => { return { ...data }})
                             ],
                             warp: [
                                 ...galaxyResult[2].map(({ id, galaxyId, sectorA, sectorB, ...data}) => { return { ...data, destination: sectorA === sector ? sectorB : sectorA  }})
