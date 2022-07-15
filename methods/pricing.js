@@ -19,19 +19,35 @@ const goods = [
         type: 'goods', name: 'Goods', id: 2,
         cost: 50, max: 160, min: 25, costPerPopulation: 2, 
         price: function(quantity, population) { return goodsPrice(this.cost, quantity, population, this.costPerPopulation, this.max, this.min) }, 
-        tick: function(planet) { return 1; }
+        tick: function(planet) { 
+            const factories = planet.buildings.find(a => a.id === 6);
+            const populationRequirements = planet.population * this.costPerPopulation;
+            const newGeneration = factories * 1000000;
+            return newGeneration - populationRequirements; 
+        }
     },
     { 
         type: 'goods', name: 'Energy', id: 3,
         cost: 4, max: 15, min: 1, costPerPopulation: 50, 
         price: function(quantity, population) { return goodsPrice(this.cost, quantity, population, this.costPerPopulation, this.max, this.min) }, 
-        tick: function(planet) { return 1; }
+        tick: function(planet) {
+            const solarFarms = planet.buildings.find(a => a.id === 5).quantity;
+            const solarRadiation = planet.solarRadiation;
+            const populationRequirements = planet.population * this.costPerPopulation;
+            const energyGeneration = solarFarms * 20000000 * Math.pow(solarRadiation, 0.20);
+            return energyGeneration - populationRequirements; 
+        }
     },
     { 
         type: 'goods', name: 'Construction Materials', id: 4,
-        cost: 100, max: 300, min: 40, costPerPopulation: 10, 
+        cost: 100, max: 300, min: 40, costPerPopulation: 1, 
         price: function(quantity, population) { return goodsPrice(this.cost, quantity, population, this.costPerPopulation, this.max, this.min) }, 
-        tick: function(planet) { return 1; }
+        tick: function(planet) {
+            const plants = planet.buildings.find(a => a.id === 7).quantity;
+            const populationRequirements = planet.population * this.costPerPopulation;
+            const constructionGeneration = plants * 20000;
+            return constructionGeneration - populationRequirements
+        }
     },
     { 
         type: 'building', cost: 2000000, name: 'Solar Farms', id: 5, 
@@ -56,6 +72,8 @@ const goods = [
 ]
 
 function getNameFromId(id) { return goods.find(a => a.id === id).name; }
+function getBuildingPrice(id) { return goods.find(a => a.id === id).cost; }
+
 
 /**
  * Fnction to call which returns the appropriate price for the good based upon the population and stock.
@@ -101,3 +119,4 @@ function getGoodsObject() {
 module.exports.getNameFromId = getNameFromId;
 module.exports.getPrice = getPrice;
 module.exports.getGoodsObject = getGoodsObject;
+module.exports.getBuildingPrice = getBuildingPrice;

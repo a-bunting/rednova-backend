@@ -3,6 +3,7 @@ const methods = require('../methods/methods');
 const mysql = require('mysql');
 const db = require('../environment');
 const pricing = require('../methods/pricing');
+const { connect } = require('mongoose');
 
 class Game {
         
@@ -23,6 +24,7 @@ class Game {
         const getGalaxies = `SELECT id, name, width, height, depth, tickPeriod, startTurns, TIMESTAMPDIFF(SECOND, startTime, CURRENT_TIMESTAMP()) AS tDiff, UNIX_TIMESTAMP(startTime) as timeStartUnix, UNIX_TIMESTAMP(endTime) as timeEndUnix  FROM universe__galaxies WHERE startTime < NOW() AND endTime > NOW()`;
 
         connection.connect(connectionError => {
+            if(connectionError) console.log(`Error connecting to MySQL to retrive servers: ${connectionError}`);
             connection.query(getGalaxies, (e, galaxies) => {
                 if(e) console.log(`Error getting servers: ${e}`);
 
@@ -39,31 +41,6 @@ class Game {
                         galaxies[i].startTurns, 
                         galaxies[i].timeStartUnix, galaxies[i].timeEndUnix
                     );
-
-                    // let serverObject = {
-                    //     id: galaxies[i].id, 
-                    //     name: galaxies[i].name, 
-                    //     size: { width: galaxies[i].width, height: galaxies[i].height, depth: galaxies[i].depth },
-                    //     tickPeriod: galaxies[i].tickPeriod, 
-                    //     startingTurns: galaxies[i].startTurns, 
-                    //     time: { start: galaxies[i].timeStartUnix, end: galaxies[i].timeEndUnix, sinceStart: galaxies[i].tDiff }
-                    // }
-
-                    // // push onto the server array
-                    // this.servers.push(serverObject);
-                    // // now get the remainer of the time for a tick
-                    // const initialTickTime = serverObject.tickPeriod - (serverObject.time.sinceStart % serverObject.tickPeriod);
-
-                    // console.log(`Server for galaxy ${serverObject.id} (${serverObject.name}) has a first tick in ${initialTickTime}`);
-
-                    // setTimeout(() => {
-                    //     this.tick(serverObject.id);
-                    //     console.log(`Server for galaxy ${serverObject.id} is now on a ticktimer of ${serverObject.tickPeriod}s - there will be no more logs from this server...`);
-                    //     // once the first timeout occurs, thats the first tick ended and the server can proceed with a tick per tick interval
-                    //     const serverInterval = setInterval(() => {
-                    //         this.tick(serverObject.id);
-                    //     }, serverObject.tickPeriod * 1000)  
-                    // }, initialTickTime * 1000);
                 }
             })
         })
@@ -107,15 +84,52 @@ class Game {
         console.log(`Destroyed galaxy number ${galaxyId}`);
     }
 
+    /**
+     * PROCESSES THE DIFFERENT ELEMENTS OF A TICK
+     * Does not yet
+     * -- Deal with the IGB
+     * -- Destroy population if the amount needed ot sustain them is not present
+     * @param {*} galaxyId 
+     */
     tick(galaxyId) {
         console.log(`Tick on Galaxy ${galaxyId}`);
         this.tickSendUserMessage(galaxyId); // works
         this.tickUpdatePlanets(galaxyId);   // works
+        this.tickupUpdatePopulation(galaxyId);// untested
     }
 
-    tickUpdatePlanets(galaxyId) {
+    /**
+     * Updates the population on each planet
+     * With a 1 min turn rate, it will go from 50000 to 100 mill pop in 30 days ish
+     * every 3 days the population will double on its own
+     * @param {*} galaxyId 
+     */
+    tickupUpdatePopulation(galaxyId) {
         const connection = mysql.createConnection(db);
-        const planetQuery = `   SELECT sectorid, planetindex, population, distance, solarRadiation, onPlanet
+        const sql = `UPDATE universe__planets SET population = population * 1.00016 WHERE galaxyid=${galaxyId}`;
+        
+        connection.connect(conErr => {
+            connection.query(sql, (e, r) => {
+                connection.destroy();
+                // return true if it passes.
+                if(!e) return true;
+                else return false;
+            })
+        })
+    }
+
+    tickIGB(galaxyId) {
+        // for later
+    }
+
+    /**
+     * Updates the planets money and resources
+     * @param {*} galaxyId 
+     */
+    tickUpdatePlanets(galaxyId) {
+
+        const connection = mysql.createConnection({...db, multipleStatements: true});
+        const planetQuery = `   SELECT sectorid, planetindex, population, distance, solarRadiation, onPlanet, currency
                                 FROM universe__planets 
                                 WHERE galaxyid=${galaxyId}`;
 
@@ -125,24 +139,33 @@ class Game {
                 const goods = pricing.getGoodsObject();
 
                 // the empoty arrays which will do the query...
-                let massSearchArray = [];
+                let massGoodsArray = [];
+                let massPlanetInterest = [];
 
                 // loop over each planet...
                 for(let i = 0 ; i < planets.length ; i++) {
                     const planet = { ...planets[i], buildings: JSON.parse(planets[i].onPlanet) };
                     
+                    // do the goods
                     for(let o = 0 ; o < goods.length ; o++) {
-                        const addition = goods[o].tick(planet);
-                        // the match and the set arrays...
-                        massSearchArray.push([goods[o].id, galaxyId, planet.sectorid, planet.planetindex, addition]);
+                        if(goods[o].type === `goods`) {
+                            const addition = goods[o].tick(planet);
+                            // the match and the set arrays...
+                            massGoodsArray.push([goods[o].id, galaxyId, planet.sectorid, planet.planetindex, Math.floor(addition ? addition : 0)]);
+                        }
                     }
+
+                    // planetary interest
+                    const newMoney = Math.ceil((planet.population / 100000000) * (0.00048 + 1)) * planet.currency;
+                    massPlanetInterest.push([galaxyId, planet.sectorid, planet.planetindex, newMoney]);
                 }
 
                 // update query
-                const updateGoodsSql = `INSERT INTO universe__planetsgoods (goodid, galaxyid, sectorid, planetid, quantity) VALUES ? ON DUPLICATE KEY UPDATE quantity = quantity + VALUES(quantity)`;
+                const updateGoodsSql = `INSERT INTO universe__planetsgoods (goodid, galaxyid, sectorid, planetid, quantity) VALUES ? ON DUPLICATE KEY UPDATE quantity = IF(quantity + VALUES(quantity) < 0, 0, quantity + VALUES(quantity));
+                                        INSERT INTO universe__planets (galaxyid, sectorid, planetindex, currency) VALUES ? ON DUPLICATE KEY UPDATE currency = VALUES(currency)`;
 
                 // and update...
-                connection.query(updateGoodsSql, [massSearchArray], (e, r) => {
+                connection.query(updateGoodsSql, [massGoodsArray, massPlanetInterest], (e, r) => {
                     connection.destroy();
 
                     if(!e) return true;
@@ -152,17 +175,15 @@ class Game {
         })
     }
 
+    /**
+     * Sends users within a galaxy a message to let them know a tick has taken place
+     * @param {*} galaxyId 
+     */
     tickSendUserMessage(galaxyId) {
         const server = this.servers.find(server => server.id === galaxyId);
         const message = { type: 'tick', message: '', data: { quantity: 1, timeUntilNextTick: server.tickPeriod }};
         this.sendWebsockMessage(message, galaxyId);
     }
-    
-    getTimeAlive() {
-        return this.tickCounter * this.tickInterval;
-    }
-    
-
 
     clients = [];
     wss;
@@ -189,10 +210,18 @@ class Game {
                         user.data.galaxyId = +message.galaxyId;
 
                         const serverObject = this.servers.find(a => a.id === user.data.galaxyId);
-                        const initialTickTime = serverObject.tickPeriod - (serverObject.time.sinceStart % serverObject.tickPeriod);
-                        const initialMessage = { type: 'subscribed', message: '', data: { timeUntilNextTick: initialTickTime } };
 
-                        this.sendWebsockMessage(JSON.stringify(initialMessage), user.data.galaxyId, user);
+                        if(!serverObject) {
+                            // galaxy not found, send user back to main page.
+                            this.sendWebsockMessage(JSON.stringify(
+                                { type: 'criticalServerFailure', message: 'Galaxy not found...', data: { } }
+                            ), user.data.galaxyId, user);
+                        } else {
+                            // galaxy found and can be subscribed to
+                            const initialTickTime = serverObject.tickPeriod - (serverObject.time.sinceStart % serverObject.tickPeriod);
+                            const initialMessage = { type: 'subscribed', message: '', data: { timeUntilNextTick: initialTickTime } };
+                            this.sendWebsockMessage(JSON.stringify(initialMessage), user.data.galaxyId, user);
+                        }
                     }
                 } else console.log(`Message from ${message.username}: ${msg}`);
             });
@@ -209,12 +238,24 @@ class Game {
 
         })
     }
-
+    
+    /**
+     * Returns the sector that a user is in
+     * @param {string} email 
+     * @param {number} galaxyid 
+     * @param {number} sector 
+     */
     setUsersSector(email, galaxyid, sector) {
         const user = this.clients.find(a => (a.data.email === email && a.data.galaxyId === +galaxyid));
         if(user) user.data.sector = sector;
     }
 
+    /**
+     * Sends a message either to all players on all galaxies, all players on a galaxy or to players in a single sector of a single galaxy
+     * @param {JSON} msg 
+     * @param {number} galaxyId 
+     * @param {number} sectorId 
+     */
     sendWebsockMessage(msg, galaxyId, sectorId) {
 
         this.clients.forEach(client => {
