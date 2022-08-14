@@ -7,6 +7,7 @@ const userRoutes = require('./routes/user');
 const moveRoutes = require('./routes/move');
 const galaxyRoutes = require('./routes/galaxy');
 const planetRoutes = require('./routes/planet');
+const tradeRoutes = require('./routes/trade');
 const router = require('./routes/admin');
 
 const app = express();
@@ -22,7 +23,6 @@ app.use((req, res, next) => {
   next();
 })
 
-
 // all the various api calls...
 
 // to shield admin changes from websockets.
@@ -36,5 +36,6 @@ app.use("/api/user", userRoutes);
 app.use("/api/move", moveRoutes);
 app.use("/api/galaxy", galaxyRoutes);
 app.use("/api/planet", planetRoutes);
+app.use("/api/trade", tradeRoutes);
 
 module.exports = app;

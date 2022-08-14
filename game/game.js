@@ -3,7 +3,6 @@ const methods = require('../methods/methods');
 const mysql = require('mysql');
 const db = require('../environment');
 const pricing = require('../methods/pricing');
-const { connect } = require('mongoose');
 
 class Game {
         
@@ -173,6 +172,11 @@ class Game {
                 })
              })
         })
+    }
+
+    getServer(galaxyId) {
+        const galaxy = this.servers.find(a => a.id === +galaxyId);
+        return galaxy;
     }
 
     /**

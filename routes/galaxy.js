@@ -5,10 +5,13 @@ const checkAdmin = require('../middleware/check-admin');
 const mysql = require('mysql');
 const db = require('../environment');
 const methods = require('../methods/methods');
+const sectorFunctions = require('../methods/sector-functions');
+const gameFunctions = require('../methods/game-functions');
 
 const Galaxy = require('../galaxy/galaxy.model');
 const { database } = require('../environment');
 const { query } = require('express');
+const { engine } = require('express/lib/application');
 
 router.get('/getPlayableGalaxyList', (req, res, next) => {
     getSql = "SELECT *, TIMESTAMPDIFF(SECOND, startTime, CURRENT_TIMESTAMP()) AS tDiff FROM universe__galaxies WHERE startTime < NOW() AND endTime > NOW()";
@@ -134,7 +137,9 @@ router.get('/getUserGalaxyData', checkAuth, (req, res, next) => {
                     if(e) console.log(`Error: ${e}`)
                     connection.destroy();
 
-                    const turnsAvailable = calculateAvailableTurns(galaxyResult[3][0].tickPeriod, galaxyResult[3][0].startTurns, galaxyResult[4][0].tDiff, galaxyResult[4][0].turnsUsed);
+                    // const turnsAvailable = calculateAvailableTurns(galaxyResult[3][0].tickPeriod, galaxyResult[3][0].startTurns, galaxyResult[4][0].tDiff, galaxyResult[4][0].turnsUsed);
+                    const server = req.game.getServer(galaxyId);
+                    const turnsAvailable = gameFunctions.getUserTurns(server, galaxyResult[4][0].tDiff, galaxyResult[4][0].turnsUsed);
 
                     const galaxy = galaxyResult[0].map(({ id, galaxyid, ...data}) => { return { ...data }})[0];
                     const ship = result.map(({ galaxyid, userid, ...data}) => { return { ...data }})[0];
@@ -164,6 +169,8 @@ router.get('/getUserGalaxyData', checkAuth, (req, res, next) => {
                         }
                     }
 
+                    // this is async but it doesnt impact the rest of the flow so no need to wait for it to finish
+                    sectorFunctions.setUserVisitedSector(userData.id, sector, galaxyId);
                     // set the users sector...
                     req.game.setUsersSector(userData.email, galaxyId, data.ship.sector);
                     // alert other uer sin the same sector to their arrival...

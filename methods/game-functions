@@ -1,0 +1,13 @@
+function getHullCapacity(hullSize) {
+    return 100000000;
+}
+
+function getUserTurns(server, secsSinceJoin, turnsUsed) {
+    const turnRate = server.tickPeriod;
+    const surplus = secsSinceJoin % turnRate;
+    const total = (secsSinceJoin - surplus) / turnRate;
+    return Math.min(2500, server.startingTurns + total - turnsUsed);
+}
+
+module.exports.getHullCapacity = getHullCapacity;
+module.exports.getUserTurns = getUserTurns;
