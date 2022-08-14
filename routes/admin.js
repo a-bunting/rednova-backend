@@ -2,8 +2,7 @@ const express = require('express');
 const router = express.Router();
 const checkAuth = require('../middleware/check-auth');
 const checkAdmin = require('../middleware/check-admin');
-const mysql = require('mysql');
-const db = require('../environment');
+const db = require('../database');
 const methods = require('../methods/methods');
 const errors = require('../methods/errors');
 const pricing = require('../methods/pricing');
@@ -26,102 +25,92 @@ router.post('/generateUniverse', checkAuth, checkAdmin, (req, res, next) => {
     // now upload to the database
     let galaxySql = `INSERT INTO universe__galaxies (name, sectors, width, height, depth, endTime) VALUES ("${galaxyName}", ${galaxy.systems.length}, ${width}, ${height}, ${depth}, DATE_ADD(CURRENT_TIMESTAMP(), INTERVAL 1 MONTH)) ; SELECT id, name, startTime, endTime FROM universe__galaxies WHERE id = LAST_INSERT_ID()`;
 
-    const connection = mysql.createConnection({...db, multipleStatements: true});
+    db.query(galaxySql, (e, result) => {
+        if(e) errors.returnError(`Database query failure: ${galaxySql}`);
 
-    connection.connect((connectionError) => {
-        if(connectionError) errors.returnError(`Database connection failure`);
+        const galaxyId = result[0].insertId;
+        let systemValues = [];
+        let planetBuildingValues = [];
+        let planetGoodValues = [];
 
-        connection.query(galaxySql, (e, result) => {
-            if(e) errors.returnError(`Database query failure: ${galaxySql}`);
+        // now add systems...
+        for(let i = 0 ; i < galaxy.systems.length ; i++) {
+            const system = galaxy.systems[i];
+            systemValues.push([i+1, galaxyId, system.coordinates.x, system.coordinates.y, system.coordinates.z, system.size, system.id, system.star.power])
 
-            const galaxyId = result[0].insertId;
-            let systemValues = [];
-            let planetBuildingValues = [];
-            let planetGoodValues = [];
+            for(let o = 0 ; o < system.planets.length ; o++) {
+                const planet = system.planets[o];
 
-            // now add systems...
-            for(let i = 0 ; i < galaxy.systems.length ; i++) {
-                const system = galaxy.systems[i];
-                systemValues.push([i+1, galaxyId, system.coordinates.x, system.coordinates.y, system.coordinates.z, system.size, system.id, system.star.power])
-
-                for(let o = 0 ; o < system.planets.length ; o++) {
-                    const planet = system.planets[o];
-
-                    for(let s = 0 ; s < planet.products.length ; s++) {
-                        planetGoodValues.push([planet.products[s].id, galaxyId, i+1, o+1, planet.products[s].quantity]);
-                    }
-                    planetBuildingValues.push([galaxyId, i+1, o+1, planet.name, planet.population, planet.distance, planet.solarRadiation, planet.fields, JSON.stringify(planet.buildings)])
+                for(let s = 0 ; s < planet.products.length ; s++) {
+                    planetGoodValues.push([planet.products[s].id, galaxyId, i+1, o+1, planet.products[s].quantity]);
                 }
+                planetBuildingValues.push([galaxyId, i+1, o+1, planet.name, planet.population, planet.distance, planet.solarRadiation, planet.fields, JSON.stringify(planet.buildings)])
             }
+        }
 
-            const systemSql = `INSERT INTO universe__systems (sectorid, galaxyid, x, y, z, size, givenname, starPower) VALUES ?`;
-            const planetsSql = `INSERT INTO universe__planets (galaxyid, sectorid, planetindex, name, population, distance, solarRadiation, fields, onPlanet) VALUES ?`;
-            const planetGoodSql = `INSERT INTO universe__planetsgoods (goodid, galaxyid, sectorid, planetid, quantity) VALUES ?`;
+        const systemSql = `INSERT INTO universe__systems (sectorid, galaxyid, x, y, z, size, givenname, starPower) VALUES ?`;
+        const planetsSql = `INSERT INTO universe__planets (galaxyid, sectorid, planetindex, name, population, distance, solarRadiation, fields, onPlanet) VALUES ?`;
+        const planetGoodSql = `INSERT INTO universe__planetsgoods (goodid, galaxyid, sectorid, planetid, quantity) VALUES ?`;
 
-            connection.query(`${systemSql} ; ${planetsSql} ; ${planetGoodSql}`, [systemValues, planetBuildingValues, planetGoodValues], (e, r) => {
-                if(e) errors.returnError(`Database query failure: ${systemSql}; ${planetsSql} ; ${planetGoodSql}`, res);
+        db.query(`${systemSql} ; ${planetsSql} ; ${planetGoodSql}`, [systemValues, planetBuildingValues, planetGoodValues], (e, r) => {
+            if(e) errors.returnError(`Database query failure: ${systemSql}; ${planetsSql} ; ${planetGoodSql}`, res);
 
-                // get the id of the starting planet and update the galaxies database
-                    // update the galaxy start position with this id...
-                    const galaxyUpdate = `UPDATE universe__galaxies SET startPosition=${startPosition} WHERE id=${galaxyId}`;
+            // get the id of the starting planet and update the galaxies database
+                // update the galaxy start position with this id...
+                const galaxyUpdate = `UPDATE universe__galaxies SET startPosition=${startPosition} WHERE id=${galaxyId}`;
 
-                    connection.query(galaxyUpdate, (e, r) => {
-                        if(e) errors.returnError(`Database query failure: ${galaxyUpdate}`);
-                        // return all the systems now, this is so the id of the system can be appended to the correct planets
-                        const systemQuery = `SELECT id, sectorid, givenname FROM universe__systems WHERE galaxyid=${galaxyId}`;
-                        
-                        connection.query(systemQuery, (e, systemsResult) => {
-                            if(e) errors.returnError(`Database query failure: ${systemQuery}`);
-                            // create a big update query to update the planets in one query...
-                            let updateQuery = "";
-                        
-                            for(let i = 0 ; i < systemsResult.length ; i++) {
-                                updateQuery += ` WHEN name LIKE "${systemsResult[i].givenname}%" THEN ${systemsResult[i].id}`;
+                db.query(galaxyUpdate, (e, r) => {
+                    if(e) errors.returnError(`Database query failure: ${galaxyUpdate}`);
+                    // return all the systems now, this is so the id of the system can be appended to the correct planets
+                    const systemQuery = `SELECT id, sectorid, givenname FROM universe__systems WHERE galaxyid=${galaxyId}`;
+                    
+                    db.query(systemQuery, (e, systemsResult) => {
+                        if(e) errors.returnError(`Database query failure: ${systemQuery}`);
+                        // create a big update query to update the planets in one query...
+                        let updateQuery = "";
+                    
+                        for(let i = 0 ; i < systemsResult.length ; i++) {
+                            updateQuery += ` WHEN name LIKE "${systemsResult[i].givenname}%" THEN ${systemsResult[i].id}`;
+                        }
+
+                            if(e) console.log(e);
+
+                            let warpInsertValues = [];
+
+                            // finally finally add in warp routes...
+                            for(let i = 0 ; i < galaxy.systems.length ; i++) {
+                                const system = galaxy.systems[i];
+                                const systemId = systemsResult.filter(a => a.givenname === system.id)[0].sectorid;
+
+                                for(let o = 0 ; o < system.warpRoutes.length ; o++) {
+                                    const toSystemId = systemsResult.filter(a => a.givenname === system.warpRoutes[o].id)[0].sectorid;
+                                    // check if this route exists the other way around...
+                                    const exists = warpInsertValues.findIndex(a => a[1] === toSystemId && a[2] === systemId);
+                                    // if this doesnt exist then fine, add it...
+                                    if(exists === -1) warpInsertValues.push([galaxyId, systemId, toSystemId]);
+                                }
                             }
 
+                            const warpRouteInsert = "INSERT INTO universe__warp (galaxyId, sectorA, sectorB) VALUES ?";
+
+                            db.query(warpRouteInsert, [warpInsertValues], (e, r) => {
                                 if(e) console.log(e);
-
-                                let warpInsertValues = [];
-
-                                // finally finally add in warp routes...
-                                for(let i = 0 ; i < galaxy.systems.length ; i++) {
-                                    const system = galaxy.systems[i];
-                                    const systemId = systemsResult.filter(a => a.givenname === system.id)[0].sectorid;
-
-                                    for(let o = 0 ; o < system.warpRoutes.length ; o++) {
-                                        const toSystemId = systemsResult.filter(a => a.givenname === system.warpRoutes[o].id)[0].sectorid;
-                                        // check if this route exists the other way around...
-                                        const exists = warpInsertValues.findIndex(a => a[1] === toSystemId && a[2] === systemId);
-                                        // if this doesnt exist then fine, add it...
-                                        if(exists === -1) warpInsertValues.push([galaxyId, systemId, toSystemId]);
-                                    }
-                                }
-
-                                const warpRouteInsert = "INSERT INTO universe__warp (galaxyId, sectorA, sectorB) VALUES ?";
-
-                                connection.query(warpRouteInsert, [warpInsertValues], (e, r) => {
-                                    connection.destroy();
-                                    if(e) console.log(e);
-                                    // create the backend tick server
-                                    // UNTESTED
-                                    req.game.createServer(galaxyId, galaxyName, width, height, depth, 300, 1000, result[1][0].startTime, result[1][0].endTime);
-                                    // return the success
-                                    res.status(201).json({ error: false, message: '', data: { id: galaxyId, name: galaxyName, startTime: result[1][0].startTime } })
-                                })
-                        })
+                                // create the backend tick server
+                                // UNTESTED
+                                req.game.createServer(galaxyId, galaxyName, width, height, depth, 300, 1000, result[1][0].startTime, result[1][0].endTime);
+                                // return the success
+                                res.status(201).json({ error: false, message: '', data: { id: galaxyId, name: galaxyName, startTime: result[1][0].startTime } })
+                            })
                     })
-            })
+                })
         })
     })
-});
+})
 
 router.get('/getGalaxyList', checkAuth, checkAdmin, (req, res, next) => {
     getSql = "SELECT * FROM universe__galaxies";
-    const connection = mysql.createConnection(db);
 
-    connection.query(getSql, (e, result) => {
-        connection.destroy();
-
+    db.query(getSql, (e, result) => {
         if(result.length > 0) {
             const data = result.map(({depth, height, width, endTime, startPosition, ...returnData}) => { return returnData; });
             res.status(200).json({ error: false, data: data, message: '' })
@@ -133,7 +122,6 @@ router.get('/getGalaxyList', checkAuth, checkAdmin, (req, res, next) => {
 
 router.post('/deleteGalaxy', checkAuth, checkAdmin, (req, res, next) => {
     const galaxyId = req.body.galaxyId;
-    const connection = mysql.createConnection({...db, multipleStatements: true});
     const sql = `   DELETE FROM universe__galaxies WHERE id=${galaxyId} ; 
                     DELETE FROM universe__systems WHERE galaxyid=${galaxyId} ;
                     DELETE FROM universe__planets WHERE galaxyid=${galaxyId} ; 
@@ -141,8 +129,7 @@ router.post('/deleteGalaxy', checkAuth, checkAdmin, (req, res, next) => {
                     DELETE FROM universe__planetsgoods WHERE galaxyid=${galaxyId} ;
                     DELETE FROM ships__users WHERE galaxyid=${galaxyId}`;
 
-    connection.query(sql, (e, r) => {
-        connection.destroy();
+    db.query(sql, (e, r) => {
         if(!e) {
             req.game.destroyServer(galaxyId);
             res.status(204).json({ error: false, message: `Galaxy ${galaxyId} was deleted`, data: {} })

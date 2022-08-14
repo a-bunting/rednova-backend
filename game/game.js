@@ -1,7 +1,7 @@
 const WebSocket = require('ws');
 const methods = require('../methods/methods');
 const mysql = require('mysql');
-const db = require('../environment');
+const db = require('../database');
 const pricing = require('../methods/pricing');
 
 class Game {
@@ -19,29 +19,24 @@ class Game {
     }
 
     setUpServers() {
-        const connection = mysql.createConnection(db);
+        // const connection = mysql.createConnection(db);
         const getGalaxies = `SELECT id, name, width, height, depth, tickPeriod, startTurns, TIMESTAMPDIFF(SECOND, startTime, CURRENT_TIMESTAMP()) AS tDiff, UNIX_TIMESTAMP(startTime) as timeStartUnix, UNIX_TIMESTAMP(endTime) as timeEndUnix  FROM universe__galaxies WHERE startTime < NOW() AND endTime > NOW()`;
 
-        connection.connect(connectionError => {
-            if(connectionError) console.log(`Error connecting to MySQL to retrive servers: ${connectionError}`);
-            connection.query(getGalaxies, (e, galaxies) => {
-                if(e) console.log(`Error getting servers: ${e}`);
+        db.query(getGalaxies, (e, galaxies) => {
 
-                connection.destroy();
+            if(e || !galaxies) console.log(`Error getting servers: ${e}`);
 
-                // loop over each server setting up a tick cycle for each
-                for(let i = 0 ; i < galaxies.length ; i++) {   
-                    
-                    this.createServer(
-                        galaxies[i].id, 
-                        galaxies[i].name, 
-                        galaxies[i].width, galaxies[i].height, galaxies[i].depth,
-                        galaxies[i].tickPeriod, 
-                        galaxies[i].startTurns, 
-                        galaxies[i].timeStartUnix, galaxies[i].timeEndUnix
-                    );
-                }
-            })
+            // loop over each server setting up a tick cycle for each
+            for(let i = 0 ; i < galaxies.length ; i++) {   
+                this.createServer(
+                    galaxies[i].id, 
+                    galaxies[i].name, 
+                    galaxies[i].width, galaxies[i].height, galaxies[i].depth,
+                    galaxies[i].tickPeriod, 
+                    galaxies[i].startTurns, 
+                    galaxies[i].timeStartUnix, galaxies[i].timeEndUnix
+                );
+            }
         })
     }
 
@@ -104,16 +99,12 @@ class Game {
      * @param {*} galaxyId 
      */
     tickupUpdatePopulation(galaxyId) {
-        const connection = mysql.createConnection(db);
         const sql = `UPDATE universe__planets SET population = population * 1.00016 WHERE galaxyid=${galaxyId}`;
         
-        connection.connect(conErr => {
-            connection.query(sql, (e, r) => {
-                connection.destroy();
-                // return true if it passes.
-                if(!e) return true;
-                else return false;
-            })
+        db.query(sql, (e, r) => {
+            // return true if it passes.
+            if(!e) return true;
+            else return false;
         })
     }
 
@@ -127,51 +118,48 @@ class Game {
      */
     tickUpdatePlanets(galaxyId) {
 
-        const connection = mysql.createConnection({...db, multipleStatements: true});
         const planetQuery = `   SELECT sectorid, planetindex, population, distance, solarRadiation, onPlanet, currency
                                 FROM universe__planets 
                                 WHERE galaxyid=${galaxyId}`;
 
-        connection.connect(conErr => {
-            connection.query(planetQuery, (e, planets) => {
+        db.query(planetQuery, (e, planets) => {
+            
+            const goods = pricing.getGoodsObject();
+
+            // the empoty arrays which will do the query...
+            let massGoodsArray = [];
+            let massPlanetInterest = [];
+
+            // loop over each planet...
+            for(let i = 0 ; i < planets.length ; i++) {
+                const planet = { ...planets[i], buildings: JSON.parse(planets[i].onPlanet) };
                 
-                const goods = pricing.getGoodsObject();
-
-                // the empoty arrays which will do the query...
-                let massGoodsArray = [];
-                let massPlanetInterest = [];
-
-                // loop over each planet...
-                for(let i = 0 ; i < planets.length ; i++) {
-                    const planet = { ...planets[i], buildings: JSON.parse(planets[i].onPlanet) };
-                    
-                    // do the goods
-                    for(let o = 0 ; o < goods.length ; o++) {
-                        if(goods[o].type === `goods`) {
-                            const addition = goods[o].tick(planet);
-                            // the match and the set arrays...
-                            massGoodsArray.push([goods[o].id, galaxyId, planet.sectorid, planet.planetindex, Math.floor(addition ? addition : 0)]);
-                        }
+                // do the goods
+                for(let o = 0 ; o < goods.length ; o++) {
+                    if(goods[o].type === `goods`) {
+                        const addition = goods[o].tick(planet);
+                        // the match and the set arrays...
+                        massGoodsArray.push([goods[o].id, galaxyId, planet.sectorid, planet.planetindex, Math.floor(addition ? addition : 0)]);
                     }
-
-                    // planetary interest
-                    const newMoney = Math.ceil((planet.population / 100000000) * (0.00048 + 1)) * planet.currency;
-                    massPlanetInterest.push([galaxyId, planet.sectorid, planet.planetindex, newMoney]);
                 }
 
-                // update query
-                const updateGoodsSql = `INSERT INTO universe__planetsgoods (goodid, galaxyid, sectorid, planetid, quantity) VALUES ? ON DUPLICATE KEY UPDATE quantity = IF(quantity + VALUES(quantity) < 0, 0, quantity + VALUES(quantity));
-                                        INSERT INTO universe__planets (galaxyid, sectorid, planetindex, currency) VALUES ? ON DUPLICATE KEY UPDATE currency = VALUES(currency)`;
+                // planetary interest
+                const newMoney = Math.ceil((planet.population / 100000000) * (0.00048 + 1)) * planet.currency;
+                massPlanetInterest.push([galaxyId, planet.sectorid, planet.planetindex, newMoney]);
+            }
 
-                // and update...
-                connection.query(updateGoodsSql, [massGoodsArray, massPlanetInterest], (e, r) => {
-                    connection.destroy();
+            // update query
+            const updateGoodsSql = `INSERT INTO universe__planetsgoods (goodid, galaxyid, sectorid, planetid, quantity) VALUES ? ON DUPLICATE KEY UPDATE quantity = IF(quantity + VALUES(quantity) < 0, 0, quantity + VALUES(quantity));
+                                    INSERT INTO universe__planets (galaxyid, sectorid, planetindex, currency) VALUES ? ON DUPLICATE KEY UPDATE currency = VALUES(currency)`;
 
-                    if(!e) return true;
-                    return false;
-                })
-             })
-        })
+            // and update...
+            db.query(updateGoodsSql, [massGoodsArray, massPlanetInterest], (e, r) => {
+                // connection.destroy();
+
+                if(!e) return true;
+                return false;
+            })
+            })
     }
 
     getServer(galaxyId) {
