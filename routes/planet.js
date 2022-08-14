@@ -6,7 +6,7 @@ const mysql = require('mysql');
 const db = require('../environment');
 const methods = require('../methods/methods');
 const pricing = require('../methods/pricing');
-const ship = require('../methods/ship-functions');
+const ship = require('../methods/game-functions');
 
 router.get('/getPlanetData', checkAuth, (req, res, next) => {
 
@@ -98,7 +98,7 @@ router.post('/buyResources', checkAuth, (req, res, next) => {
         connection.query(sql, (e, result) => {
             if(e) console.log(`Error: ${e}`);
 
-            const shipContents = JSON.parse(result[0][0].storage);
+            const shipContents = result[0][0].storage ? JSON.parse(result[0][0].storage) : [];
             const goodsAvailable = result[1][0].quantity;
             const price = pricing.getPrice(goodsToBuy.id, goodsAvailable, result[1][0].population).buy;
 

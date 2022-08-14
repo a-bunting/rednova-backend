@@ -6,6 +6,7 @@ const jwt = require('jsonwebtoken');
 const mysql = require('mysql');
 const db = require('../environment');
 const checkAdmin = require('../middleware/check-admin');
+const methods = require('../methods/methods');
 
 const generateToken = (email, id, username, remainLoggedIn) => {
     return jwt.sign({
@@ -58,6 +59,53 @@ router.get('/login', (req, res, next) => {
 
     })
 
+})
+
+router.get('/getNavLog', (req, res, next) => {
+    const connection = mysql.createConnection(db);
+    const galaxyId = req.query.galaxyId;
+    const userData = methods.getUserDataFromToken(req);
+
+    const sql = `   SELECT ships__logs.sectorid, GROUP_CONCAT(DISTINCT universe__planets.id SEPARATOR ',') as ids, GROUP_CONCAT(DISTINCT universe__planets.name SEPARATOR ',') as names
+                    FROM ships__logs
+                    LEFT JOIN universe__planets ON universe__planets.sectorid = ships__logs.sectorid
+                    WHERE ships__logs.userid = ${userData.id} AND ships__logs.galaxyid = ${galaxyId}
+                    GROUP BY ships__logs.sectorid`;
+
+    connection.connect(conErr => {
+
+        if(conErr) {
+            connection.destroy();
+            res.status(400).json({ error: true, message: 'Error connecting to mysql', data: {}})
+        } else {
+            connection.query(sql, (e, result) => {
+                connection.destroy();
+                if(!e) {
+                    let log = [];
+    
+                    // build the planet array
+                    for(let i = 0 ; i < result.length ; i++) {
+                        let planets = [];
+    
+                        if(result[i].ids !== null) {
+                            const planetIds = result[i].ids.split(',');
+                            const planetNames = result[i].names.split(',');
+        
+                            for(let o = 0 ; o < planetIds.length ; o++) {
+                                planets.push({ id: planetIds[o], name: planetNames[o]});
+                            }
+                        }
+                        // and push to the log
+                        log.push({ sectorid: result[i].sectorid, planets });
+                    }
+                    // return to user
+                    res.status(200).json({ error: false, message: '', data: { planetLog: log } })
+                } else {
+                    res.status(400).json({ error: true, message: 'Error querying the database...', data: {}})
+                }
+            })
+        }
+    })
 })
 
 // basically works...

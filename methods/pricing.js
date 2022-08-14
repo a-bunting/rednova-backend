@@ -83,7 +83,7 @@ function getBuildingPrice(id) { return goods.find(a => a.id === id).cost; }
  * @returns 
  */
 function getPrice(id, quantityInStock, populationOfPlanet) {
-    const getGood = goods.find(a => a.id === id);
+    const getGood = goods.find(a => +a.id === +id);
     if(!getGood) return undefined;
 
     switch(getGood.type) {
@@ -91,8 +91,6 @@ function getPrice(id, quantityInStock, populationOfPlanet) {
         case 'building': return getGood.price(quantityInStock); break;
         default: return undefined;
     }
-
-    
 }
 
 function buildingPrice(basePrice) {
