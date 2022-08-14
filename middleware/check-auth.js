@@ -9,7 +9,7 @@ module.exports = (req, res, next) => {
         jwt.verify(token, 'rednova-v2-token-this-is-to-ensure-you-are-safe-trade-well-my-friendly-peoples');
         next();
     } catch (error) {
-        res.status(401).json({
+        res.status(200).json({
             error: true, 
             data: {},
             message: `Authentication Failed - No Token: ${error}`
