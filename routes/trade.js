@@ -383,8 +383,9 @@ router.post('/executeTradeRoutes', checkAuth, (req, res, next) => {
                     // NOW reupload everything back to the database and return the log to the user...
                     const updateShip = `UPDATE ships__users SET money = ${ship.money}, sector = ${ship.sector}, storage = '${JSON.stringify(ship.storage)}' WHERE userid = ${userData.id} AND galaxyid = ${galaxyId}`;
                     const updatePlanetData = `INSERT INTO universe__planetsgoods (goodid, galaxyid, sectorid, planetid, quantity) VALUES ? ON DUPLICATE KEY UPDATE quantity = VALUES(quantity)`;
+                    const updateUsers = `UPDATE users__galaxies SET turnsUsed = turnsUsed + ${+turnsUsed} WHERE userid = ${userData.id} AND galaxyid = ${galaxyId}`;
 
-                    db.query(`${updateShip} ; ${updatePlanetData}`, [values], (e, r) => {
+                    db.query(`${updateShip} ; ${updatePlanetData} ; ${updateUsers}`, [values], (e, r) => {
                         // also needs to ensure the player has a display and data for the new sector they might be in...
                         if(!e) {
                             res.status(200).json({ error: false, message: '', data: { routeName: result[0][0].name, log: returnLog, turns: +turnsUsed, iterations: +iterationsRun }});
