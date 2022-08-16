@@ -56,9 +56,14 @@ router.get('/getNavLog', (req, res, next) => {
     const galaxyId = req.query.galaxyId;
     const userData = methods.getUserDataFromToken(req);
 
-    const sql = `   SELECT ships__logs.sectorid, GROUP_CONCAT(DISTINCT universe__planets.id SEPARATOR ',') as ids, GROUP_CONCAT(DISTINCT universe__planets.name SEPARATOR ',') as names
+    const sql = `   SELECT 
+                        ships__logs.sectorid, GROUP_CONCAT(DISTINCT universe__planets.id SEPARATOR ',') as ids, GROUP_CONCAT(DISTINCT universe__planets.name SEPARATOR ',') as names, 
+                        universe__systems.x, universe__systems.y, universe__systems.z, 
+                        GROUP_CONCAT(DISTINCT universe__warp.sectorA SEPARATOR ',') as warpA, GROUP_CONCAT(DISTINCT universe__warp.sectorB SEPARATOR ',') as warpB
                     FROM ships__logs
                     LEFT JOIN universe__planets ON universe__planets.sectorid = ships__logs.sectorid
+                    LEFT JOIN universe__systems ON universe__systems.sectorid = ships__logs.sectorid
+                    LEFT JOIN universe__warp ON universe__warp.sectorA = ships__logs.sectorid OR universe__warp.sectorB = ships__logs.sectorid
                     WHERE ships__logs.userid = ${userData.id} AND ships__logs.galaxyid = ${galaxyId}
                     GROUP BY ships__logs.sectorid`;
 
@@ -69,6 +74,7 @@ router.get('/getNavLog', (req, res, next) => {
             // build the planet array
             for(let i = 0 ; i < result.length ; i++) {
                 let planets = [];
+                let warpRoutes = [];
 
                 if(result[i].ids !== null) {
                     const planetIds = result[i].ids.split(',');
@@ -78,8 +84,15 @@ router.get('/getNavLog', (req, res, next) => {
                         planets.push({ id: planetIds[o], name: planetNames[o]});
                     }
                 }
+
+                if(result[i].warpA !== null) {
+                    warpRoutes = [...new Set(result[i].warpA.split(',').map(Number).concat(result[i].warpB.split(',').map(Number)))];
+                }
+
+                console.log(result[i].sectorid, warpRoutes);
+
                 // and push to the log
-                log.push({ sectorid: result[i].sectorid, planets });
+                log.push({ sectorid: result[i].sectorid, planets, coordinates: { x: result[i].x, y: result[i].y, z: result[i].z }, warp: warpRoutes });
             }
             // return to user
             res.status(200).json({ error: false, message: '', data: { planetLog: log } })
