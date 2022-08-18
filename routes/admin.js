@@ -36,7 +36,7 @@ router.post('/generateUniverse', checkAuth, checkAdmin, (req, res, next) => {
         // now add systems...
         for(let i = 0 ; i < galaxy.systems.length ; i++) {
             const system = galaxy.systems[i];
-            systemValues.push([i+1, galaxyId, system.coordinates.x, system.coordinates.y, system.coordinates.z, system.size, system.id, system.star.power])
+            systemValues.push([i+1, galaxyId, system.coordinates.x, system.coordinates.y, system.coordinates.z, system.size, system.id, system.star.power, system.star.size])
 
             for(let o = 0 ; o < system.planets.length ; o++) {
                 const planet = system.planets[o];
@@ -44,12 +44,12 @@ router.post('/generateUniverse', checkAuth, checkAdmin, (req, res, next) => {
                 for(let s = 0 ; s < planet.products.length ; s++) {
                     planetGoodValues.push([planet.products[s].id, galaxyId, i+1, o+1, planet.products[s].quantity]);
                 }
-                planetBuildingValues.push([galaxyId, i+1, o+1, planet.name, planet.population, planet.distance, planet.solarRadiation, planet.fields, JSON.stringify(planet.buildings)])
+                planetBuildingValues.push([galaxyId, i+1, o+1, planet.name, planet.population, planet.distance, planet.solarRadiation, planet.fields, planet.moons, JSON.stringify(planet.buildings)])
             }
         }
 
-        const systemSql = `INSERT INTO universe__systems (sectorid, galaxyid, x, y, z, size, givenname, starPower) VALUES ?`;
-        const planetsSql = `INSERT INTO universe__planets (galaxyid, sectorid, planetindex, name, population, distance, solarRadiation, fields, onPlanet) VALUES ?`;
+        const systemSql = `INSERT INTO universe__systems (sectorid, galaxyid, x, y, z, size, givenname, starPower, starSize) VALUES ?`;
+        const planetsSql = `INSERT INTO universe__planets (galaxyid, sectorid, planetindex, name, population, distance, solarRadiation, fields, moons, onPlanet) VALUES ?`;
         const planetGoodSql = `INSERT INTO universe__planetsgoods (goodid, galaxyid, sectorid, planetid, quantity) VALUES ?`;
 
         db.query(`${systemSql} ; ${planetsSql} ; ${planetGoodSql}`, [systemValues, planetBuildingValues, planetGoodValues], (e, r) => {
