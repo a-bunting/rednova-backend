@@ -9,6 +9,8 @@ class Planet {
     fields; // how much space there is to build initially.
     population;
 
+    moons;
+
     products;  
     buildings;
 
@@ -17,6 +19,7 @@ class Planet {
         this.solarRadiation = star.power / Math.pow(this.distance, 2);
         this.name = methods.generateRandomSciFiName(index, systemName.split(' '), true, true, 2, 3, planetNumberInName);
         this.fields = 400 * this.distance * ((Math.random() / 2) + 0.5);
+        this.moons = Math.floor(Math.random() * 3);
 
         // eventually in a game organics will only be enough to satisfy a constant population
         // need to ensure when the algorithms are decided that the population starst low enough that
