@@ -102,6 +102,20 @@ router.get('/getNavLog', (req, res, next) => {
     })
 })
 
+router.post('/register', (req, res, next) => {
+    const username = req.body['username'];
+    const password = req.body['password'];
+    const email = req.body['email'];
+
+    if(username && password && email) {
+
+        res.status(200).json({ error: false, message: '', data: {}})   
+    } else {
+        res.status(200).json({ error: true, message: 'Not all required data has been provided.', data: {}})   
+    }
+
+})
+
 // basically works...
 router.get('/checkAuth', checkAuth, (req, res, next) => {
     res.status(200).json({ error: false, message: '', data: { }})   
