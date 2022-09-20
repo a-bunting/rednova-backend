@@ -1,6 +1,6 @@
 # StellarNova Backend (Click here for the live site!)
 
-<a href="https://github.com/Bogomip/rednova/tree/main/rednova">For the front end GitHub site please click here</a>
+<a href="https://github.com/Bogomip/rednova/tree/main/rednova">For the front end GitHub site with a video demo and up-to-date todo list please click here</a>
 
 StellarNova is a web based MMO space trading game, based upon the a 2002 game <a href="https://blacknova.net/">Black Nova Traders</a> by Ron Harwood. It is a modern recreation which improves significantly upon UI making for a more fluid gameplay, and rebalances the game to enable different play modes for users.
 
