@@ -6,15 +6,13 @@ StellarNova is a web based MMO space trading game, based upon the a 2002 game <a
 
 ## Tech Usage
 
-StellarNova is a Express, MySQL, Angular and Node creation. It has a customfront end (<a href="https://github.com/Bogomip/rednova/tree/main/rednova">repo</a>) and backend (current repo).
+StellarNova is a Express, MySQL, Angular and Node creation. It has a custom front end (<a href="https://github.com/Bogomip/rednova/tree/main/rednova">repo</a>) and backend (current repo).
 
 This node/express backend has a pooled connection to the mysql database to create a fast and efficient database connection and keep the frontend moving as fast as possible for the player.
 
 ## To Do List
 
-This the main game todo list and a more updated version is listed on the <a href="https://github.com/Bogomip/rednova/tree/main/rednova">front end site</a>.
-
-To view the main itemised todo list, head on over to my <a href="https://trello.com/b/ld1f6gOQ/rednova">Trello page</a> for this project. The general implementation phases are:
+This is the main game todo list and a more updated version is listed on the <a href="https://github.com/Bogomip/rednova/tree/main/rednova">front end site</a>. To view the main itemised todo list, head on over to my <a href="https://trello.com/b/ld1f6gOQ/rednova">Trello page</a> for this project. The general implementation phases are:
 
 - [x] Phase 1 - Movement and Universe Creation
 - [x] Phase 2 - Planets
