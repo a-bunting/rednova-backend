@@ -18,10 +18,11 @@ const generateToken = (email, id, username, remainLoggedIn) => {
  */
 router.get('/login', (req, res, next) => {
 
+    
     // redo this for when it goes live.
-    const email = req.body.email ? req.body.email : req.query.email ? req.query.email : 'alex.bunting@gmail.com';
-    const password = req.body.password ? req.body.password : req.query.password ? req.query.password : 'pies';
-    const remainLoggedIn = req.body.remainLoggedIn ? req.body.remainLoggedIn : req.query.remainLoggedIn ? req.query.remainLoggedIn : '7d';
+    const email = req.query.email;
+    const password = req.query.password;
+    const remainLoggedIn = req.query.remainLoggedIn ? req.query.remainLoggedIn : req.query.remainLoggedIn ? req.query.remainLoggedIn : '7d';
     
     // hash the password to see what it matches in the db
     // get the user data to test if the password is true, and also get the admin details...
@@ -32,6 +33,7 @@ router.get('/login', (req, res, next) => {
         } else {                
             // test the password
             bcrypt.compare(password, userDetails[0][0].password).then(correctPassword => {
+
                 if(correctPassword) {
                     const userData = {
                         token: generateToken(userDetails[0][0].email, userDetails[0][0].id, userDetails[0][0].username, remainLoggedIn),
@@ -102,14 +104,57 @@ router.get('/getNavLog', (req, res, next) => {
     })
 })
 
+ipList = [];
+
 router.post('/register', (req, res, next) => {
     const username = req.body['username'];
     const password = req.body['password'];
     const email = req.body['email'];
 
-    if(username && password && email) {
+    var ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress 
 
-        res.status(200).json({ error: false, message: '', data: {}})   
+    const ipListIndex = ipList.findIndex(a => a.ip === ip);
+
+    if(username && password && email) {
+        if(ipListIndex === -1) {
+            // not created within 10 secs and username, password and email are all good...
+            // accounttype of 1 is anonymous and 0 is normal
+            const accountType = email.split('@')[1] === 'sn.org' ? 1 : 0;
+
+            // bcrypt stuff
+            const saltRounds = 10;
+            
+            bcrypt.hash(password, saltRounds, (err, hashPass) => {
+                const query = `INSERT INTO users (email, password, username, accountType) VALUES ('${email}', '${hashPass}', '${username}', ${accountType})`;
+    
+                db.query(query, (e, result) => {
+                    if(!e) {
+                        // on success disallow this person from making a new account within 10 seconds...
+                        const timeout = setTimeout(() => {
+                            const ipListIndex = ipList.findIndex(a => a.ip === ip);
+            
+                            if(ipListIndex !== -1) {
+                                clearInterval(ipList[ipListIndex])
+                                ipList.splice(ipListIndex, 1);
+                            }
+                        }, 10000);
+            
+                        const newLoginBlock = { interval : timeout, ip: ip };
+                        ipList.push(newLoginBlock);
+            
+                        res.status(200).json({ error: false, message: '', data: {}});
+                    } else {
+                        res.status(200).json({ error: true, message: 'There was an error inserting your data into the database.', data: {}})   
+                    }
+                })
+            });
+
+
+        } else {
+            // user can only create a new anonymous account every 10 seconds max
+            timeLeft = Math.ceil((ipList[ipListIndex].interval._idleStart + ipList[ipListIndex].interval._idleTimeout) / 1000);
+            res.status(200).json({ error: true, message: 'A new user can only be created every 10 seconds.', data: { timeLeft }})   
+        }
     } else {
         res.status(200).json({ error: true, message: 'Not all required data has been provided.', data: {}})   
     }
