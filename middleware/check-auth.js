@@ -6,7 +6,7 @@ const jwt = require('jsonwebtoken');
 module.exports = (req, res, next) => {
     try {
         const token = req.headers.authorization.split(" ")[1];
-        jwt.verify(token, 'rednova-v2-token-this-is-to-ensure-you-are-safe-trade-well-my-friendly-peoples');
+        jwt.verify(token, process.env.SALT);
         next();
     } catch (error) {
         res.status(200).json({

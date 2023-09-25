@@ -1,20 +1,12 @@
 const mysql = require('mysql');
 
-// const mysqlConnectionData = {
-//     host: 'sql134.main-hosting.eu', 
-//     user: 'u656701484_rednovaadmin',
-//     password: 'r3dN0V4**!',
-//     database: 'u656701484_rednova'
-// };
-
 const mysqlPool = mysql.createPool({
-    connectionLimit: 1, 
-    host: 'sql134.main-hosting.eu', 
-    user: 'u656701484_rednovaadmin',
-    password: 'r3dN0V4**!',
-    database: 'u656701484_rednova', 
-    multipleStatements: true
+  host: process.env.DB_SERVER,
+  user: process.env.DB_USERNAME,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
+  connectionLimit: 1,
+  multipleStatements: true
 })
 
-// module.exports = mysqlConnectionData;
 module.exports = mysqlPool;

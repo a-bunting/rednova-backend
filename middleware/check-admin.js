@@ -9,8 +9,8 @@ module.exports = (req, res, next) => {
         const token = req.headers.authorization.split(" ")[1];
         const userInfo = jwt.decode(token);
 
-        jwt.verify(token, 'rednova-v2-token-this-is-to-ensure-you-are-safe-trade-well-my-friendly-peoples');
-        
+        jwt.verify(token, process.env.SALT);
+       
         const query = `SELECT COUNT(*) AS cnt FROM users__admin WHERE username="${userInfo.id}" AND email="${userInfo.email}"`;
 
         db.query(query, (e, result) => {

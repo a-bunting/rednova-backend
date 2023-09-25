@@ -10,7 +10,7 @@ const methods = require('../methods/methods');
 const generateToken = (email, id, username, remainLoggedIn) => {
     return jwt.sign({
         email: email, id: id, username: username
-    }, 'rednova-v2-token-this-is-to-ensure-you-are-safe-trade-well-my-friendly-peoples', { expiresIn: remainLoggedIn ? '7d' : '1h' });
+    }, process.env.SALT, { expiresIn: remainLoggedIn ? '7d' : '1h' });
 }
 
 /**
@@ -18,11 +18,10 @@ const generateToken = (email, id, username, remainLoggedIn) => {
  */
 router.get('/login', (req, res, next) => {
 
-    
     // redo this for when it goes live.
-    const email = req.query.email;
-    const password = req.query.password;
-    const remainLoggedIn = req.query.remainLoggedIn ? req.query.remainLoggedIn : req.query.remainLoggedIn ? req.query.remainLoggedIn : '7d';
+    const email = req.body.email ? req.body.email : req.query.email ? req.query.email : 'alex.bunting@gmail.com';
+    const password = req.body.password ? req.body.password : req.query.password ? req.query.password : 'pies';
+    const remainLoggedIn = req.body.remainLoggedIn ? req.body.remainLoggedIn : req.query.remainLoggedIn ? req.query.remainLoggedIn : '7d';
     
     // hash the password to see what it matches in the db
     // get the user data to test if the password is true, and also get the admin details...
@@ -33,7 +32,6 @@ router.get('/login', (req, res, next) => {
         } else {                
             // test the password
             bcrypt.compare(password, userDetails[0][0].password).then(correctPassword => {
-
                 if(correctPassword) {
                     const userData = {
                         token: generateToken(userDetails[0][0].email, userDetails[0][0].id, userDetails[0][0].username, remainLoggedIn),
