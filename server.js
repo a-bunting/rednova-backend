@@ -1,4 +1,4 @@
-require('dotenv').config({ path: `${__dirname}/common.env`});
+// require('dotenv').config({ path: `${__dirname}/common.env`});
 const app = require("./app");
 const http = require("http");
 
