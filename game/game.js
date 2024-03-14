@@ -181,7 +181,7 @@ class Game {
     wss;
 
     webSocketServer() {
-        this.wss = new WebSocket.Server({ port: 7072 });
+        this.wss = new WebSocket.Server({ noServer: true });
 
         this.wss.on('connection', (ws) => {
             const id = methods.generateRandomId(5);

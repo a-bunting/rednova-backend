@@ -8,8 +8,7 @@ app.use((req, res, next) => {
     res.header('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
     res.header('Access-Control-Allow-Headers', 'Authorization, Content-Type');
     next();
-  });
-
+});
 
 const adminRoutes = require('./routes/admin');
 const userRoutes = require('./routes/user');
@@ -18,6 +17,7 @@ const galaxyRoutes = require('./routes/galaxy');
 const planetRoutes = require('./routes/planet');
 const tradeRoutes = require('./routes/trade');
 const router = require('./routes/admin');
+
 
 const game = new Game();
 
